@@ -36,6 +36,10 @@ Open in browser:
    - `http://localhost:5173/login`
    - Login: `admin` / `Admin1234!`
 
+## Deployment (Vercel / Cloudflare / Railway)
+
+- See `docs/deployment.md`
+
 ## Smoke test
 
 - `powershell -ExecutionPolicy Bypass -File scripts/smoke-test.ps1`
