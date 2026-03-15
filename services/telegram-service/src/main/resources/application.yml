@@ -1,0 +1,50 @@
+server:
+  port: 8086
+
+spring:
+  application:
+    name: telegram-service
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    consumer:
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      repositories:
+        enabled: false
+
+security:
+  jwt:
+    secret: ${JWT_SECRET:change-me-change-me-change-me-change-me-32b}
+
+kafka:
+  topics:
+    asset-events: ${KAFKA_TOPIC_ASSET_EVENTS:asset.events}
+
+services:
+  identity-base: ${IDENTITY_API_BASE:http://identity-service:8081}
+  asset-base: ${ASSET_API_BASE:http://asset-service:8082}
+
+telegram:
+  bot:
+    token: ${TELEGRAM_BOT_TOKEN:}
+  polling:
+    enabled: ${TELEGRAM_POLLING_ENABLED:true}
+    timeout-seconds: ${TELEGRAM_POLL_TIMEOUT_SECONDS:20}
+    limit: ${TELEGRAM_POLL_LIMIT:50}
+    delay-ms: ${TELEGRAM_POLL_DELAY_MS:1100}
+  checks:
+    enabled: ${TELEGRAM_CHECKS_ENABLED:true}
+    period-days: ${TELEGRAM_CHECK_PERIOD_DAYS:30}
+    cron: ${TELEGRAM_CHECK_CRON:0 0 9 * * *}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+

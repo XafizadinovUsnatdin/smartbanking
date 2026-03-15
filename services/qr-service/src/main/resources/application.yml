@@ -1,0 +1,29 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: qr-service
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+qr:
+  secret: ${QR_SECRET:change-me-change-me-change-me-change-me-32b}
+  ttl: ${QR_TTL:P30D}
+  payload-base-url: ${QR_PAYLOAD_BASE_URL:}
+
+security:
+  jwt:
+    secret: ${JWT_SECRET:change-me-change-me-change-me-change-me-32b}
+
+services:
+  asset:
+    base-url: ${ASSET_API_BASE:http://localhost:8082}
+  identity:
+    base-url: ${IDENTITY_API_BASE:http://localhost:8081}
+
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}

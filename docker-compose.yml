@@ -1,0 +1,199 @@
+x-logging: &default-logging
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  postgres:
+    image: postgres:16
+    logging: *default-logging
+    environment:
+      POSTGRES_USER: smartbanking
+      POSTGRES_PASSWORD: smartbanking
+      POSTGRES_DB: identity_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./.data/postgres:/var/lib/postgresql/data
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U smartbanking -d identity_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 40
+
+  redis:
+    image: redis:7
+    logging: *default-logging
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./.data/redis:/data
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    logging: *default-logging
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    volumes:
+      - ./.data/zookeeper/data:/var/lib/zookeeper/data
+      - ./.data/zookeeper/log:/var/lib/zookeeper/log
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 2181"]
+      interval: 5s
+      timeout: 3s
+      retries: 40
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    logging: *default-logging
+    restart: unless-stopped
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    ports:
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    volumes:
+      - ./.data/kafka:/var/lib/kafka/data
+
+  identity-service:
+    build:
+      context: .
+      dockerfile: services/identity-service/Dockerfile
+    logging: *default-logging
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/identity_db
+      DB_USER: smartbanking
+      DB_PASS: smartbanking
+      JWT_SECRET: change-me-change-me-change-me-change-me-32b
+      BOOTSTRAP_ADMIN_USERNAME: admin
+      BOOTSTRAP_ADMIN_PASSWORD: Admin1234!
+      BOOTSTRAP_ADMIN_FULL_NAME: System Admin
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+
+  asset-service:
+    build:
+      context: .
+      dockerfile: services/asset-service/Dockerfile
+    logging: *default-logging
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      redis:
+        condition: service_started
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/asset_db
+      DB_USER: smartbanking
+      DB_PASS: smartbanking
+      KAFKA_BOOTSTRAP: kafka:9092
+      REDIS_HOST: redis
+      JWT_SECRET: change-me-change-me-change-me-change-me-32b
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    volumes:
+      - ./.data/asset-photos:/data/asset-photos
+
+  audit-service:
+    build:
+      context: .
+      dockerfile: services/audit-service/Dockerfile
+    logging: *default-logging
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/audit_db
+      DB_USER: smartbanking
+      DB_PASS: smartbanking
+      KAFKA_BOOTSTRAP: kafka:9092
+    restart: unless-stopped
+    ports:
+      - "8083:8083"
+
+  qr-service:
+    build:
+      context: .
+      dockerfile: services/qr-service/Dockerfile
+    logging: *default-logging
+    depends_on:
+      - redis
+    environment:
+      REDIS_HOST: redis
+      QR_SECRET: change-me-change-me-change-me-change-me-32b
+      QR_PAYLOAD_BASE_URL: http://localhost:5173
+      JWT_SECRET: change-me-change-me-change-me-change-me-32b
+      ASSET_API_BASE: http://asset-service:8082
+      IDENTITY_API_BASE: http://identity-service:8081
+    restart: unless-stopped
+    ports:
+      - "8084:8084"
+
+  inventory-analytics-service:
+    build:
+      context: .
+      dockerfile: services/inventory-analytics-service/Dockerfile
+    logging: *default-logging
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/analytics_db
+      DB_USER: smartbanking
+      DB_PASS: smartbanking
+      KAFKA_BOOTSTRAP: kafka:9092
+    restart: unless-stopped
+    ports:
+      - "8085:8085"
+
+  telegram-service:
+    build:
+      context: .
+      dockerfile: services/telegram-service/Dockerfile
+    logging: *default-logging
+    depends_on:
+      kafka:
+        condition: service_started
+      redis:
+        condition: service_started
+      identity-service:
+        condition: service_started
+      asset-service:
+        condition: service_started
+    environment:
+      KAFKA_BOOTSTRAP: kafka:9092
+      REDIS_HOST: redis
+      JWT_SECRET: change-me-change-me-change-me-change-me-32b
+      IDENTITY_API_BASE: http://identity-service:8081
+      ASSET_API_BASE: http://asset-service:8082
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHECK_PERIOD_DAYS: ${TELEGRAM_CHECK_PERIOD_DAYS:-30}
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
