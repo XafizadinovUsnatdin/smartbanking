@@ -3,19 +3,27 @@ package com.smartbanking.asset.service;
 import com.smartbanking.asset.domain.AssetRequest;
 import com.smartbanking.asset.domain.AssetRequestItem;
 import com.smartbanking.asset.domain.AssetRequestStatus;
+import com.smartbanking.asset.domain.AssetStatus;
+import com.smartbanking.asset.domain.OwnerType;
 import com.smartbanking.asset.outbox.OutboxEventService;
 import com.smartbanking.asset.repo.AssetCategoryRepository;
+import com.smartbanking.asset.repo.AssetRepository;
 import com.smartbanking.asset.repo.AssetRequestItemRepository;
 import com.smartbanking.asset.repo.AssetRequestRepository;
 import com.smartbanking.asset.web.BadRequestException;
+import com.smartbanking.asset.web.ConflictException;
 import com.smartbanking.asset.web.NotFoundException;
+import com.smartbanking.asset.web.dto.AssignRequest;
+import java.util.ArrayList;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,15 +32,21 @@ public class AssetRequestService {
   private final AssetRequestRepository requestRepo;
   private final AssetRequestItemRepository itemRepo;
   private final AssetCategoryRepository categoryRepo;
+  private final AssetRepository assetRepo;
+  private final AssetService assetService;
   private final OutboxEventService outbox;
 
   public AssetRequestService(AssetRequestRepository requestRepo,
                              AssetRequestItemRepository itemRepo,
                              AssetCategoryRepository categoryRepo,
+                             AssetRepository assetRepo,
+                             AssetService assetService,
                              OutboxEventService outbox) {
     this.requestRepo = requestRepo;
     this.itemRepo = itemRepo;
     this.categoryRepo = categoryRepo;
+    this.assetRepo = assetRepo;
+    this.assetService = assetService;
     this.outbox = outbox;
   }
 
@@ -56,6 +70,8 @@ public class AssetRequestService {
   ) {}
 
   public record DemandSummary(String categoryCode, String type, long quantity) {}
+  public record MissingItem(String categoryCode, String type, int missingQuantity) {}
+  public record FulfillResult(RequestView request, List<UUID> assignedAssetIds, List<MissingItem> missing) {}
 
   @Transactional
   public RequestView create(CreateRequest req, String principal, String actor, String correlationId) {
@@ -132,12 +148,17 @@ public class AssetRequestService {
     r.decide(status, actor, normalizeNote(note));
     requestRepo.save(r);
 
-    outbox.enqueue("AssetRequestStatusChanged", "ASSET_REQUEST", requestId, actor, correlationId, Map.of(
-        "entityType", "ASSET_REQUEST",
-        "entityId", requestId.toString(),
-        "requestId", requestId.toString(),
-        "status", r.getStatus().name()
-    ));
+    Map<String, Object> payload = new HashMap<>();
+    payload.put("entityType", "ASSET_REQUEST");
+    payload.put("entityId", requestId.toString());
+    payload.put("requestId", requestId.toString());
+    payload.put("requesterId", r.getRequesterId().toString());
+    payload.put("requesterUsername", r.getRequesterUsername());
+    payload.put("status", r.getStatus().name());
+    payload.put("decidedAt", r.getDecidedAt() == null ? null : r.getDecidedAt().toString());
+    payload.put("decidedBy", r.getDecidedBy());
+    payload.put("decisionNote", r.getDecisionNote());
+    outbox.enqueue("AssetRequestStatusChanged", "ASSET_REQUEST", requestId, actor, correlationId, payload);
 
     return get(requestId);
   }
@@ -154,13 +175,101 @@ public class AssetRequestService {
     r.decide(AssetRequestStatus.CANCELLED, actor, normalizeNote(note));
     requestRepo.save(r);
 
-    outbox.enqueue("AssetRequestCancelled", "ASSET_REQUEST", requestId, actor, correlationId, Map.of(
-        "entityType", "ASSET_REQUEST",
-        "entityId", requestId.toString(),
-        "requestId", requestId.toString(),
-        "status", r.getStatus().name()
-    ));
+    Map<String, Object> payload = new HashMap<>();
+    payload.put("entityType", "ASSET_REQUEST");
+    payload.put("entityId", requestId.toString());
+    payload.put("requestId", requestId.toString());
+    payload.put("requesterId", r.getRequesterId().toString());
+    payload.put("requesterUsername", r.getRequesterUsername());
+    payload.put("status", r.getStatus().name());
+    payload.put("decidedAt", r.getDecidedAt() == null ? null : r.getDecidedAt().toString());
+    payload.put("decidedBy", r.getDecidedBy());
+    payload.put("decisionNote", r.getDecisionNote());
+    outbox.enqueue("AssetRequestCancelled", "ASSET_REQUEST", requestId, actor, correlationId, payload);
     return get(requestId);
+  }
+
+  @Transactional
+  public FulfillResult fulfill(UUID requestId, String actor, String correlationId) {
+    AssetRequest r = requestRepo.findById(requestId).orElseThrow(() -> new NotFoundException("Request not found"));
+    if (r.getStatus().isTerminal()) {
+      throw new BadRequestException("Request already terminal: " + r.getStatus());
+    }
+    if (r.getStatus() != AssetRequestStatus.APPROVED) {
+      throw new BadRequestException("Request must be APPROVED before fulfill");
+    }
+
+    List<AssetRequestItem> items = itemRepo.findAllByRequestId(requestId);
+    if (items == null || items.isEmpty()) {
+      throw new BadRequestException("Request items not found");
+    }
+
+    List<UUID> assignedAssetIds = new ArrayList<>();
+    List<MissingItem> missing = new ArrayList<>();
+
+    for (AssetRequestItem it : items) {
+      int need = it.getQuantity();
+      if (need <= 0) continue;
+
+      List<UUID> candidateIds = assetRepo.findAvailableIds(
+          AssetStatus.REGISTERED,
+          it.getCategoryCode(),
+          it.getAssetType(),
+          PageRequest.of(0, need)
+      );
+
+      int assignedForItem = 0;
+      for (UUID assetId : candidateIds) {
+        try {
+          assetService.assign(assetId, new AssignRequest(OwnerType.EMPLOYEE, r.getRequesterId(), "Fulfill request " + requestId), actor, correlationId);
+          assignedAssetIds.add(assetId);
+          assignedForItem++;
+        } catch (ConflictException ignored) {
+          // Another process may have assigned it concurrently; try the next one.
+        }
+      }
+
+      int miss = need - assignedForItem;
+      if (miss > 0) {
+        missing.add(new MissingItem(it.getCategoryCode(), it.getAssetType(), miss));
+      }
+    }
+
+    if (missing.isEmpty()) {
+      r.decide(AssetRequestStatus.FULFILLED, actor, mergeDecisionNote(r.getDecisionNote(), "Fulfilled"));
+      requestRepo.save(r);
+      outbox.enqueue("AssetRequestStatusChanged", "ASSET_REQUEST", requestId, actor, correlationId, Map.of(
+          "entityType", "ASSET_REQUEST",
+          "entityId", requestId.toString(),
+          "requestId", requestId.toString(),
+          "requesterId", r.getRequesterId().toString(),
+          "requesterUsername", r.getRequesterUsername(),
+          "status", r.getStatus().name(),
+          "decidedAt", r.getDecidedAt() == null ? null : r.getDecidedAt().toString(),
+          "decidedBy", r.getDecidedBy(),
+          "decisionNote", r.getDecisionNote(),
+          "assignedAssetIds", assignedAssetIds.stream().map(UUID::toString).toList()
+      ));
+    } else {
+      r.touchUpdatedAt();
+      requestRepo.save(r);
+      outbox.enqueue("AssetRequestFulfillmentPartial", "ASSET_REQUEST", requestId, actor, correlationId, Map.of(
+          "entityType", "ASSET_REQUEST",
+          "entityId", requestId.toString(),
+          "requestId", requestId.toString(),
+          "requesterId", r.getRequesterId().toString(),
+          "requesterUsername", r.getRequesterUsername(),
+          "status", r.getStatus().name(),
+          "missing", missing.stream().map(m -> Map.of(
+              "categoryCode", m.categoryCode(),
+              "type", m.type(),
+              "missingQuantity", m.missingQuantity()
+          )).toList(),
+          "assignedAssetIds", assignedAssetIds.stream().map(UUID::toString).toList()
+      ));
+    }
+
+    return new FulfillResult(get(requestId), assignedAssetIds, missing);
   }
 
   public List<DemandSummary> demandSummary(List<AssetRequestStatus> statuses) {
@@ -231,6 +340,15 @@ public class AssetRequestService {
     String trimmed = note.trim();
     if (trimmed.isBlank()) return null;
     return trimmed.length() > 1000 ? trimmed.substring(0, 1000) : trimmed;
+  }
+
+  private static String mergeDecisionNote(String existing, String extra) {
+    String a = normalizeNote(existing);
+    String b = normalizeNote(extra);
+    if (a == null) return b;
+    if (b == null) return a;
+    String merged = a + "\n" + b;
+    return merged.length() > 1000 ? merged.substring(0, 1000) : merged;
   }
 
   private record Principal(UUID userId, String username) {}

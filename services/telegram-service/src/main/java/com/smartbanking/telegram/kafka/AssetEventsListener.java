@@ -36,7 +36,16 @@ public class AssetEventsListener {
     if (json == null || json.isBlank()) return;
 
     EventEnvelope env = objectMapper.readValue(json, EventEnvelope.class);
-    if (!"AssetAssigned".equals(env.eventType())) return;
+    if ("AssetAssigned".equals(env.eventType())) {
+      onAssetAssigned(env);
+      return;
+    }
+    if ("AssetRequestStatusChanged".equals(env.eventType())) {
+      onAssetRequestStatusChanged(env);
+    }
+  }
+
+  private void onAssetAssigned(EventEnvelope env) {
     Map<String, Object> p = env.payload();
     if (p == null) return;
 
@@ -72,8 +81,48 @@ public class AssetEventsListener {
     telegram.sendMessage(user.telegramChatId(), text);
   }
 
+  private void onAssetRequestStatusChanged(EventEnvelope env) {
+    Map<String, Object> p = env.payload();
+    if (p == null) return;
+
+    String entityType = p.get("entityType") == null ? "" : String.valueOf(p.get("entityType"));
+    if (!"ASSET_REQUEST".equalsIgnoreCase(entityType)) return;
+
+    UUID requesterId;
+    try {
+      requesterId = UUID.fromString(String.valueOf(p.get("requesterId")));
+    } catch (Exception ignored) {
+      return;
+    }
+
+    IdentityUser user;
+    try {
+      user = identity.getUser(requesterId);
+    } catch (Exception e) {
+      return;
+    }
+    if (user == null || user.telegramChatId() == null) return;
+
+    String status = p.get("status") == null ? "" : String.valueOf(p.get("status")).trim().toUpperCase();
+    String note = p.get("decisionNote") == null ? null : String.valueOf(p.get("decisionNote"));
+
+    String header = switch (status) {
+      case "APPROVED" -> "So'rovingiz tasdiqlandi.";
+      case "REJECTED" -> "So'rovingiz rad etildi.";
+      case "FULFILLED" -> "So'rovingiz bajarildi.";
+      case "CANCELLED" -> "So'rovingiz bekor qilindi.";
+      default -> null;
+    };
+
+    if (header == null) return;
+    String text = header;
+    if (note != null && !note.isBlank()) {
+      text = text + "\n\nIzoh: " + note.trim();
+    }
+    telegram.sendMessage(user.telegramChatId(), text);
+  }
+
   private static String safe(String s) {
     return s == null ? "-" : s;
   }
 }
-

@@ -8,6 +8,7 @@ import { formatDateTime } from '../lib/utils';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { useI18n } from '../i18n/I18nProvider';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 function safeJson(json: string): any | null {
   try {
@@ -21,16 +22,21 @@ export function AuditLogs() {
   const { t } = useI18n();
   const [loading, setLoading] = useState(true);
   const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [entityType, setEntityType] = useState<'ASSET' | 'ASSET_REQUEST'>('ASSET');
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
 
   useEffect(() => {
+    setPage(0);
+  }, [entityType]);
+
+  useEffect(() => {
     (async () => {
       setLoading(true);
       try {
-        const resp = await searchAudit({ entityType: 'ASSET', page, size: 50 });
+        const resp = await searchAudit({ entityType, page, size: 50 });
         setLogs(resp.content || []);
         setTotalPages(resp.totalPages || 0);
         setTotalElements(resp.totalElements || 0);
@@ -40,7 +46,7 @@ export function AuditLogs() {
         setLoading(false);
       }
     })();
-  }, [page]);
+  }, [page, entityType]);
 
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -69,15 +75,28 @@ export function AuditLogs() {
       </div>
 
       <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <Input
-            type="text"
-            placeholder={t('audit.searchPlaceholder')}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
+        <div className="flex flex-col md:flex-row gap-3">
+          <div className="md:w-60">
+            <Select value={entityType} onValueChange={(v) => setEntityType(v as any)}>
+              <SelectTrigger>
+                <SelectValue placeholder={t('common.select')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ASSET">{t('audit.entityType.ASSET')}</SelectItem>
+                <SelectItem value="ASSET_REQUEST">{t('audit.entityType.ASSET_REQUEST')}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <Input
+              type="text"
+              placeholder={t('audit.searchPlaceholder')}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
         </div>
       </div>
 
@@ -107,8 +126,25 @@ export function AuditLogs() {
           <div className="divide-y divide-gray-200">
             {filtered.map((log) => {
               const env = log.payload ? safeJson(log.payload) : null;
-              const serial = String(env?.payload?.serialNumber || '');
-              const assetName = String(env?.payload?.name || '');
+              const p = env?.payload || {};
+              const serial = String(p?.serialNumber || '');
+              const assetName = String(p?.name || '');
+              const fromStatus = p?.fromStatus ? String(p.fromStatus) : '';
+              const toStatus = p?.toStatus ? String(p.toStatus) : '';
+              const ownerType = p?.ownerType ? String(p.ownerType) : '';
+              const ownerId = p?.ownerId ? String(p.ownerId) : '';
+              const reason = p?.reason ? String(p.reason) : '';
+              const requestStatus = p?.status ? String(p.status) : '';
+              const requesterUsername = p?.requesterUsername ? String(p.requesterUsername) : '';
+
+              const metaParts = [
+                fromStatus && toStatus ? `status: ${fromStatus} → ${toStatus}` : null,
+                ownerType && ownerId ? `owner: ${ownerType} ${ownerId}` : null,
+                requestStatus && requesterUsername ? `request: ${requestStatus} (${requesterUsername})` : null,
+                reason ? `reason: ${reason}` : null,
+              ].filter(Boolean) as string[];
+
+              const pretty = env ? JSON.stringify(env, null, 2) : null;
               return (
                 <div key={log.id} className="p-6 hover:bg-gray-50 transition-colors">
                   <div className="flex gap-4">
@@ -123,13 +159,28 @@ export function AuditLogs() {
                         <div className="flex-1">
                           <h4 className="font-semibold text-gray-900">{log.eventType}</h4>
 
-                          <Link
-                            to={`/assets/${log.entityId}`}
-                            className="inline-flex items-center gap-2 mt-2 text-sm text-blue-600 hover:text-blue-700"
-                          >
-                            <Package className="w-4 h-4" />
-                            {assetName ? `${assetName} (${serial || log.entityId})` : serial || log.entityId}
-                          </Link>
+                          {log.entityType === 'ASSET' ? (
+                            <Link
+                              to={`/assets/${log.entityId}`}
+                              className="inline-flex items-center gap-2 mt-2 text-sm text-blue-600 hover:text-blue-700"
+                            >
+                              <Package className="w-4 h-4" />
+                              {assetName ? `${assetName} (${serial || log.entityId})` : serial || log.entityId}
+                            </Link>
+                          ) : (
+                            <div className="inline-flex items-center gap-2 mt-2 text-sm text-gray-700">
+                              <Package className="w-4 h-4 text-gray-400" />
+                              {serial || log.entityId}
+                            </div>
+                          )}
+
+                          {metaParts.length > 0 && (
+                            <div className="mt-2 space-y-1 text-xs text-gray-500">
+                              {metaParts.map((m) => (
+                                <div key={m}>{m}</div>
+                              ))}
+                            </div>
+                          )}
 
                           <div className="flex items-center gap-4 mt-3 text-xs text-gray-500">
                             <div className="flex items-center gap-1">
@@ -141,6 +192,17 @@ export function AuditLogs() {
                               {formatDateTime(log.occurredAt)}
                             </div>
                           </div>
+
+                          {pretty && (
+                            <details className="mt-4">
+                              <summary className="text-sm text-blue-600 hover:text-blue-700 cursor-pointer select-none">
+                                {t('audit.details')}
+                              </summary>
+                              <pre className="mt-2 p-3 bg-gray-50 border border-gray-200 rounded-lg text-xs overflow-auto max-h-80">
+                                {pretty}
+                              </pre>
+                            </details>
+                          )}
                         </div>
                         <div className="text-xs text-gray-400 font-mono">{log.id}</div>
                       </div>

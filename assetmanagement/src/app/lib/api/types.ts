@@ -55,6 +55,9 @@ export interface Department {
   id: string;
   name: string;
   branchId?: string | null;
+  phoneNumber?: string | null;
+  telegramUsername?: string | null;
+  telegramChatId?: number | null;
   createdAt: string;
 }
 
@@ -147,6 +150,18 @@ export interface AssetRequest {
   decidedBy?: string | null;
   decisionNote?: string | null;
   items: AssetRequestItem[];
+}
+
+export interface AssetRequestFulfillMissingItem {
+  categoryCode: string;
+  type: string;
+  missingQuantity: number;
+}
+
+export interface AssetRequestFulfillResult {
+  request: AssetRequest;
+  assignedAssetIds: string[];
+  missing: AssetRequestFulfillMissingItem[];
 }
 
 export interface AssetRequestDemandSummary {

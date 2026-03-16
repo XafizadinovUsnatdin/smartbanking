@@ -7,12 +7,13 @@ import { useI18n } from '../i18n/I18nProvider';
 import { useAuth } from './AuthProvider';
 import { bulkAssetQrTokens } from '../lib/api/qr';
 import { downloadAssetPhotoByUrl, getActiveOwnerSummary, listAssignedAssets, listCategories, listLatestPhotos } from '../lib/api/assets';
-import { listBranches, listDepartments, listUsers } from '../lib/api/identity';
+import { listBranches, listDepartments, listUsers, updateDepartment, updateUser } from '../lib/api/identity';
 import type { AssetCategory, AssetStatus, AssignedAsset, Branch, Department, OwnerType, User } from '../types';
 import { formatDateTime, statusColors } from '../lib/utils';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
+import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 type OwnerTab = OwnerType;
@@ -35,6 +36,7 @@ export function Users() {
 
   const roles = user?.roles || [];
   const canManage = roles.some((r) => ['ADMIN', 'IT_ADMIN', 'ASSET_MANAGER', 'AUDITOR'].includes(r));
+  const canEdit = roles.some((r) => ['ADMIN', 'IT_ADMIN', 'ASSET_MANAGER'].includes(r));
 
   const [tab, setTab] = useState<OwnerTab>('EMPLOYEE');
   const [query, setQuery] = useState('');
@@ -110,7 +112,12 @@ export function Users() {
       return users.map((u) => {
         const deptName = u.departmentId ? deptById[u.departmentId]?.name : null;
         const branchName = u.branchId ? branchById[u.branchId]?.name : u.departmentId ? branchById[deptById[u.departmentId]?.branchId || '']?.name : null;
-        const subtitle = [u.username ? `@${u.username}` : null, deptName, branchName].filter(Boolean).join(' - ');
+        const tg = u.telegramUsername
+          ? `@${String(u.telegramUsername).replace(/^@/, '')}`
+          : u.telegramUserId
+            ? `id:${u.telegramUserId}`
+            : null;
+        const subtitle = [u.jobTitle, u.phoneNumber, tg, deptName, branchName].filter(Boolean).join(' - ');
         return {
           ownerType: 'EMPLOYEE',
           ownerId: u.id,
@@ -123,11 +130,16 @@ export function Users() {
     if (tab === 'DEPARTMENT') {
       return departments.map((d) => {
         const branchName = d.branchId ? branchById[d.branchId]?.name : null;
+        const tg = d.telegramUsername
+          ? `@${String(d.telegramUsername).replace(/^@/, '')}`
+          : d.telegramChatId
+            ? `id:${d.telegramChatId}`
+            : null;
         return {
           ownerType: 'DEPARTMENT',
           ownerId: d.id,
           title: d.name,
-          subtitle: branchName || null,
+          subtitle: [d.phoneNumber, tg, branchName].filter(Boolean).join(' - ') || null,
           count: activeCounts[getKey('DEPARTMENT', d.id)] || 0,
         };
       });
@@ -153,6 +165,97 @@ export function Users() {
   }, [rows, query]);
 
   const [selected, setSelected] = useState<OwnerRow | null>(null);
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<OwnerRow | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+
+  const [editEmployeeFullName, setEditEmployeeFullName] = useState('');
+  const [editEmployeeJobTitle, setEditEmployeeJobTitle] = useState('');
+  const [editEmployeePhone, setEditEmployeePhone] = useState('');
+  const [editEmployeeTelegramUsername, setEditEmployeeTelegramUsername] = useState('');
+  const [editEmployeeTelegramUserId, setEditEmployeeTelegramUserId] = useState('');
+
+  const [editDepartmentName, setEditDepartmentName] = useState('');
+  const [editDepartmentBranchId, setEditDepartmentBranchId] = useState<string | 'NONE'>('NONE');
+  const [editDepartmentPhone, setEditDepartmentPhone] = useState('');
+  const [editDepartmentTelegramUsername, setEditDepartmentTelegramUsername] = useState('');
+  const [editDepartmentTelegramChatId, setEditDepartmentTelegramChatId] = useState('');
+
+  const openEdit = (r: OwnerRow) => {
+    setEditTarget(r);
+    if (r.ownerType === 'EMPLOYEE') {
+      const u = userById[r.ownerId];
+      setEditEmployeeFullName(u?.fullName || '');
+      setEditEmployeeJobTitle(u?.jobTitle || '');
+      setEditEmployeePhone(u?.phoneNumber || '');
+      setEditEmployeeTelegramUsername(u?.telegramUsername || '');
+      setEditEmployeeTelegramUserId(u?.telegramUserId ? String(u.telegramUserId) : '');
+    } else if (r.ownerType === 'DEPARTMENT') {
+      const d = deptById[r.ownerId];
+      setEditDepartmentName(d?.name || '');
+      setEditDepartmentBranchId(d?.branchId || 'NONE');
+      setEditDepartmentPhone(d?.phoneNumber || '');
+      setEditDepartmentTelegramUsername(d?.telegramUsername || '');
+      setEditDepartmentTelegramChatId(d?.telegramChatId ? String(d.telegramChatId) : '');
+    }
+    setEditOpen(true);
+  };
+
+  const saveEdit = async () => {
+    if (!editTarget) return;
+    setEditSaving(true);
+    try {
+      if (editTarget.ownerType === 'EMPLOYEE') {
+        if (!editEmployeeFullName.trim()) {
+          toast.error(t('error.fillRequired'));
+          return;
+        }
+        const tgUserIdRaw = editEmployeeTelegramUserId.trim();
+        const tgUserId = tgUserIdRaw ? Number(tgUserIdRaw) : undefined;
+        if (tgUserIdRaw && !Number.isFinite(tgUserId)) {
+          toast.error(t('user.contact.telegramIdInvalid'));
+          return;
+        }
+
+        await updateUser(editTarget.ownerId, {
+          fullName: editEmployeeFullName,
+          jobTitle: editEmployeeJobTitle,
+          phoneNumber: editEmployeePhone,
+          telegramUsername: editEmployeeTelegramUsername,
+          telegramUserId: tgUserId,
+        });
+      } else if (editTarget.ownerType === 'DEPARTMENT') {
+        if (!editDepartmentName.trim()) {
+          toast.error(t('error.fillRequired'));
+          return;
+        }
+        const tgChatIdRaw = editDepartmentTelegramChatId.trim();
+        const tgChatId = tgChatIdRaw ? Number(tgChatIdRaw) : undefined;
+        if (tgChatIdRaw && !Number.isFinite(tgChatId)) {
+          toast.error(t('user.contact.telegramIdInvalid'));
+          return;
+        }
+
+        await updateDepartment(editTarget.ownerId, {
+          name: editDepartmentName,
+          branchId: editDepartmentBranchId === 'NONE' ? null : editDepartmentBranchId,
+          phoneNumber: editDepartmentPhone,
+          telegramUsername: editDepartmentTelegramUsername,
+          telegramChatId: tgChatId,
+        });
+      }
+
+      toast.success(t('users.edit.saved'));
+      setEditOpen(false);
+      setEditTarget(null);
+      await reload();
+    } catch (e: any) {
+      toast.error(e?.message || t('error.update'));
+    } finally {
+      setEditSaving(false);
+    }
+  };
 
   const actorLabel = (principal?: string | null) => {
     if (!principal) return t('common.system');
@@ -399,9 +502,16 @@ export function Users() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <Button variant="outline" size="sm" onClick={() => setSelected(r)}>
-                        {t('users.action.viewAssets')}
-                      </Button>
+                      <div className="flex items-center justify-end gap-2">
+                        <Button variant="outline" size="sm" onClick={() => setSelected(r)}>
+                          {t('users.action.viewAssets')}
+                        </Button>
+                        {canEdit && (r.ownerType === 'EMPLOYEE' || r.ownerType === 'DEPARTMENT') && (
+                          <Button variant="ghost" size="sm" onClick={() => openEdit(r)}>
+                            {t('action.edit')}
+                          </Button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -432,6 +542,29 @@ export function Users() {
               {selected ? (
                 <span className="text-gray-600">
                   {selected.title} - {t(`ownerType.${selected.ownerType}`)} - {t('common.count', { count: selected.count })}
+                  {selected.ownerType === 'EMPLOYEE' ? (
+                    (() => {
+                      const u = userById[selected.ownerId];
+                      const tg = u?.telegramUsername
+                        ? `@${String(u.telegramUsername).replace(/^@/, '')}`
+                        : u?.telegramUserId
+                          ? `id:${u.telegramUserId}`
+                          : null;
+                      const extra = [u?.jobTitle, u?.phoneNumber, tg].filter(Boolean).join(' - ');
+                      return extra ? <span className="block mt-1 text-xs text-gray-500">{extra}</span> : null;
+                    })()
+                  ) : selected.ownerType === 'DEPARTMENT' ? (
+                    (() => {
+                      const d = deptById[selected.ownerId];
+                      const tg = d?.telegramUsername
+                        ? `@${String(d.telegramUsername).replace(/^@/, '')}`
+                        : d?.telegramChatId
+                          ? `id:${d.telegramChatId}`
+                          : null;
+                      const extra = [d?.phoneNumber, tg].filter(Boolean).join(' - ');
+                      return extra ? <span className="block mt-1 text-xs text-gray-500">{extra}</span> : null;
+                    })()
+                  ) : null}
                 </span>
               ) : null}
             </DialogDescription>
@@ -602,6 +735,132 @@ export function Users() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setSelected(null)}>
               {t('common.close')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={editOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditOpen(false);
+            setEditTarget(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {editTarget?.ownerType === 'EMPLOYEE'
+                ? t('users.edit.employeeTitle')
+                : editTarget?.ownerType === 'DEPARTMENT'
+                  ? t('users.edit.departmentTitle')
+                  : t('action.edit')}
+            </DialogTitle>
+            <DialogDescription>{editTarget ? `${editTarget.title} - ${t(`ownerType.${editTarget.ownerType}`)}` : ''}</DialogDescription>
+          </DialogHeader>
+
+          {editTarget?.ownerType === 'EMPLOYEE' ? (
+            <div className="space-y-4">
+              <div>
+                <Label>{t('user.field.fullName')}</Label>
+                <Input value={editEmployeeFullName} onChange={(e) => setEditEmployeeFullName(e.target.value)} />
+              </div>
+
+              <div>
+                <Label>{t('user.field.jobTitle')}</Label>
+                <Input value={editEmployeeJobTitle} onChange={(e) => setEditEmployeeJobTitle(e.target.value)} />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <Label>{t('user.contact.phone')}</Label>
+                  <Input
+                    value={editEmployeePhone}
+                    onChange={(e) => setEditEmployeePhone(e.target.value)}
+                    placeholder={t('user.contact.phonePlaceholder')}
+                  />
+                </div>
+                <div>
+                  <Label>{t('user.contact.telegramUsername')}</Label>
+                  <Input
+                    value={editEmployeeTelegramUsername}
+                    onChange={(e) => setEditEmployeeTelegramUsername(e.target.value)}
+                    placeholder={t('user.contact.telegramUsernamePlaceholder')}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label>{t('user.contact.telegramUserId')}</Label>
+                <Input
+                  value={editEmployeeTelegramUserId}
+                  onChange={(e) => setEditEmployeeTelegramUserId(e.target.value)}
+                  placeholder={t('user.contact.telegramUserIdPlaceholder')}
+                />
+              </div>
+            </div>
+          ) : editTarget?.ownerType === 'DEPARTMENT' ? (
+            <div className="space-y-4">
+              <div>
+                <Label>{t('field.name')}</Label>
+                <Input value={editDepartmentName} onChange={(e) => setEditDepartmentName(e.target.value)} />
+              </div>
+
+              <div>
+                <Label>{t('department.field.branch')}</Label>
+                <Select value={editDepartmentBranchId} onValueChange={(v) => setEditDepartmentBranchId(v as string | 'NONE')}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={t('common.select')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="NONE">{t('common.none')}</SelectItem>
+                    {branches.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>
+                        {b.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <Label>{t('user.contact.phone')}</Label>
+                  <Input
+                    value={editDepartmentPhone}
+                    onChange={(e) => setEditDepartmentPhone(e.target.value)}
+                    placeholder={t('user.contact.phonePlaceholder')}
+                  />
+                </div>
+                <div>
+                  <Label>{t('user.contact.telegramUsername')}</Label>
+                  <Input
+                    value={editDepartmentTelegramUsername}
+                    onChange={(e) => setEditDepartmentTelegramUsername(e.target.value)}
+                    placeholder={t('user.contact.telegramUsernamePlaceholder')}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label>{t('user.contact.telegramChatId')}</Label>
+                <Input
+                  value={editDepartmentTelegramChatId}
+                  onChange={(e) => setEditDepartmentTelegramChatId(e.target.value)}
+                  placeholder={t('user.contact.telegramUserIdPlaceholder')}
+                />
+              </div>
+            </div>
+          ) : null}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)} disabled={editSaving}>
+              {t('common.cancel')}
+            </Button>
+            <Button onClick={saveEdit} disabled={editSaving || !editTarget}>
+              {editSaving ? t('common.loading') : t('common.save')}
             </Button>
           </DialogFooter>
         </DialogContent>

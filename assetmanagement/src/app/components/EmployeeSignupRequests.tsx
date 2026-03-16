@@ -20,7 +20,7 @@ function statusBadge(status: EmployeeSignupRequestStatus) {
   return `${base} bg-gray-100 text-gray-700`;
 }
 
-export function EmployeeSignupRequests() {
+export function EmployeeSignupRequestsPanel({ embedded = false }: { embedded?: boolean }) {
   const { t } = useI18n();
   const { user } = useAuth();
   const roles = user?.roles || [];
@@ -95,18 +95,14 @@ export function EmployeeSignupRequests() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold text-gray-900">{t('page.signupRequests.title')}</h2>
-          <p className="text-gray-500 mt-1">{t('page.signupRequests.subtitle')}</p>
+      {!embedded && (
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-3xl font-bold text-gray-900">{t('page.signupRequests.title')}</h2>
+            <p className="text-gray-500 mt-1">{t('page.signupRequests.subtitle')}</p>
+          </div>
         </div>
-        <div className="flex gap-3">
-          <Button variant="outline" onClick={reload} disabled={loading}>
-            <RefreshCcw className="w-4 h-4 mr-2" />
-            {t('action.refresh')}
-          </Button>
-        </div>
-      </div>
+      )}
 
       <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
         <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -131,6 +127,10 @@ export function EmployeeSignupRequests() {
                 <SelectItem value="REJECTED">{t('signupRequests.status.REJECTED')}</SelectItem>
               </SelectContent>
             </Select>
+            <Button variant="outline" onClick={reload} disabled={loading}>
+              <RefreshCcw className="w-4 h-4 mr-2" />
+              {t('action.refresh')}
+            </Button>
           </div>
         </div>
 
@@ -167,7 +167,7 @@ export function EmployeeSignupRequests() {
                       <td className="px-4 py-3 text-sm text-gray-900">
                         <div className="font-medium">{r.fullName}</div>
                         <div className="text-xs text-gray-500">
-                          {r.jobTitle} • {r.phoneNumber}
+                          {r.jobTitle} - {r.phoneNumber}
                         </div>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-900">
@@ -207,7 +207,7 @@ export function EmployeeSignupRequests() {
               {decisionKind === 'approve' ? t('signupRequests.dialog.approveTitle') : t('signupRequests.dialog.rejectTitle')}
             </DialogTitle>
             <DialogDescription>
-              {decisionTarget ? `${decisionTarget.fullName} • ${decisionTarget.jobTitle}` : ''}
+              {decisionTarget ? `${decisionTarget.fullName} - ${decisionTarget.jobTitle}` : ''}
             </DialogDescription>
           </DialogHeader>
 
@@ -228,4 +228,8 @@ export function EmployeeSignupRequests() {
       </Dialog>
     </div>
   );
+}
+
+export function EmployeeSignupRequests() {
+  return <EmployeeSignupRequestsPanel />;
 }

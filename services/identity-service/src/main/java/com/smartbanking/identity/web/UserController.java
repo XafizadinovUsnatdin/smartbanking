@@ -114,6 +114,51 @@ public class UserController {
     return toResponse(user);
   }
 
+  public record UpdateUserRequest(
+      @Size(max = 200) String fullName,
+      @Size(max = 120) String jobTitle,
+      UUID departmentId,
+      UUID branchId,
+      @Size(max = 32) String phoneNumber,
+      @Size(max = 120) String telegramUsername,
+      Long telegramUserId,
+      Long telegramChatId
+  ) {}
+
+  @PutMapping("/{id}")
+  @PreAuthorize("hasAnyRole('ADMIN','IT_ADMIN','ASSET_MANAGER')")
+  public UserResponse update(@PathVariable UUID id, @Valid @RequestBody UpdateUserRequest req) {
+    UserAccount user = repo.findById(id).orElseThrow(() -> new NotFoundException("User not found"));
+
+    if (req.fullName() != null) {
+      user.setFullName(normalize(req.fullName(), 200));
+    }
+    if (req.jobTitle() != null) {
+      user.setJobTitle(normalize(req.jobTitle(), 120));
+    }
+    if (req.departmentId() != null) {
+      user.setDepartmentId(req.departmentId());
+    }
+    if (req.branchId() != null) {
+      user.setBranchId(req.branchId());
+    }
+    if (req.phoneNumber() != null) {
+      user.setPhoneNumber(normalize(req.phoneNumber(), 32));
+    }
+    if (req.telegramUsername() != null) {
+      user.setTelegramUsername(normalizeTelegramUsername(req.telegramUsername()));
+    }
+    if (req.telegramUserId() != null) {
+      user.setTelegramUserId(req.telegramUserId());
+    }
+    if (req.telegramChatId() != null) {
+      user.setTelegramChatId(req.telegramChatId());
+    }
+
+    repo.save(user);
+    return toResponse(user);
+  }
+
   private static UserResponse toResponse(UserAccount u) {
     return new UserResponse(
         u.getId(),

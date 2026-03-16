@@ -1,9 +1,11 @@
 import { Outlet, Link, useLocation, Navigate } from 'react-router';
-import { LayoutDashboard, Package, History, QrCode, Menu, X, Building2, Tags, ClipboardList, Users, UserPlus } from 'lucide-react';
-import { useState } from 'react';
+import { LayoutDashboard, Package, History, QrCode, Menu, X, Building2, Tags, ClipboardList, Users, Bell } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useAuth } from './AuthProvider';
 import { Button } from './ui/button';
 import { useI18n } from '../i18n/I18nProvider';
+import { listAssetRequests } from '../lib/api/requests';
+import { listEmployeeSignupRequests } from '../lib/api/identity';
 
 export function RootLayout() {
   const location = useLocation();
@@ -24,7 +26,6 @@ export function RootLayout() {
     { path: '/', icon: LayoutDashboard, label: t('nav.dashboard'), color: 'text-blue-500' },
     { path: '/assets', icon: Package, label: t('nav.assets'), color: 'text-indigo-500' },
     ...(canManage ? [{ path: '/users', icon: Users, label: t('nav.users'), color: 'text-sky-500' }] : []),
-    ...(isAdmin ? [{ path: '/signup-requests', icon: UserPlus, label: t('nav.signupRequests'), color: 'text-amber-500' }] : []),
     { path: '/requests', icon: ClipboardList, label: t('nav.requests'), color: 'text-violet-500' },
     ...(canManage ? [{ path: '/categories', icon: Tags, label: t('nav.categories'), color: 'text-emerald-500' }] : []),
     { path: '/audit', icon: History, label: t('nav.audit'), color: 'text-teal-500' },
@@ -38,6 +39,37 @@ export function RootLayout() {
     );
     return item?.label || t('app.subtitle');
   };
+
+  const [pendingRequests, setPendingRequests] = useState(0);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    if (!canManage && !isAdmin) {
+      setPendingRequests(0);
+      return;
+    }
+
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const [assetReqs, signupReqs] = await Promise.all([
+          listAssetRequests('SUBMITTED'),
+          isAdmin ? listEmployeeSignupRequests('PENDING') : Promise.resolve([]),
+        ]);
+        if (cancelled) return;
+        setPendingRequests((assetReqs?.length || 0) + (signupReqs?.length || 0));
+      } catch {
+        if (!cancelled) setPendingRequests(0);
+      }
+    };
+
+    void load();
+    const id = window.setInterval(load, 30_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [accessToken, canManage, isAdmin]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -68,6 +100,20 @@ export function RootLayout() {
           </div>
 
           <div className="flex items-center gap-3">
+            {(canManage || isAdmin) && (
+              <Link
+                to="/requests"
+                className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                title={t('nav.requests')}
+              >
+                <Bell className="w-5 h-5 text-gray-700" />
+                {pendingRequests > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-red-600 text-white text-[11px] leading-5 text-center font-semibold shadow-sm">
+                    {pendingRequests > 99 ? '99+' : pendingRequests}
+                  </span>
+                )}
+              </Link>
+            )}
             <div className="hidden sm:flex items-center gap-1">
               <Button
                 variant={lang === 'uz' ? 'default' : 'outline'}

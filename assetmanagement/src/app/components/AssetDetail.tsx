@@ -301,7 +301,8 @@ export function AssetDetail() {
       }
     }
     try {
-      await assignAsset(asset.id, { ownerType: assignOwnerType, ownerId: assignOwnerId, reason: assignReason || null });
+      const reason = asset.status === 'REGISTERED' ? 'Auto-assigned' : assignReason || null;
+      await assignAsset(asset.id, { ownerType: assignOwnerType, ownerId: assignOwnerId, reason });
       toast.success(t('asset.assigned'));
       setAssignDialogOpen(false);
       await reload();
@@ -880,10 +881,12 @@ export function AssetDetail() {
                 </div>
               </div>
             ) : null}
-            <div>
-              <Label>{t('history.reason')}</Label>
-              <Input value={assignReason} onChange={(e) => setAssignReason(e.target.value)} placeholder={t('asset.reasonPlaceholder')} />
-            </div>
+            {asset?.status !== 'REGISTERED' ? (
+              <div>
+                <Label>{t('history.reason')}</Label>
+                <Input value={assignReason} onChange={(e) => setAssignReason(e.target.value)} placeholder={t('asset.reasonPlaceholder')} />
+              </div>
+            ) : null}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>

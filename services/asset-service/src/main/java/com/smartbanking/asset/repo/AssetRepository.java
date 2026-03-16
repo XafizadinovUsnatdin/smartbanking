@@ -5,6 +5,7 @@ import com.smartbanking.asset.domain.AssetStatus;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
@@ -31,4 +32,22 @@ public interface AssetRepository extends JpaRepository<Asset, UUID>, JpaSpecific
       order by count(a) desc
       """)
   List<AvailableSummaryRow> availableSummary(@Param("status") AssetStatus status);
+
+  @Query("""
+      select a.id
+      from Asset a
+      left join AssetAssignment asg on asg.assetId = a.id and asg.returnedAt is null
+      where a.deletedAt is null
+        and a.status = :status
+        and a.categoryCode = :categoryCode
+        and lower(a.type) = lower(:type)
+        and asg.id is null
+      order by a.createdAt asc
+      """)
+  List<UUID> findAvailableIds(
+      @Param("status") AssetStatus status,
+      @Param("categoryCode") String categoryCode,
+      @Param("type") String type,
+      Pageable pageable
+  );
 }

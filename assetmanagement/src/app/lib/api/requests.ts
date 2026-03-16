@@ -1,5 +1,5 @@
 import { apiBase, request } from './client';
-import type { AssetRequest, AssetRequestDemandSummary, AssetRequestStatus } from './types';
+import type { AssetRequest, AssetRequestDemandSummary, AssetRequestFulfillResult, AssetRequestStatus } from './types';
 
 export interface CreateAssetRequestItem {
   type: string;
@@ -47,3 +47,8 @@ export async function updateAssetRequestStatus(id: string, status: AssetRequestS
   });
 }
 
+export async function fulfillAssetRequest(id: string): Promise<AssetRequestFulfillResult> {
+  return request<AssetRequestFulfillResult>(`${apiBase.asset}/asset-requests/${id}/fulfill`, {
+    method: 'POST',
+  });
+}

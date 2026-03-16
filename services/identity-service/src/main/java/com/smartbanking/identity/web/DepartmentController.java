@@ -30,13 +30,24 @@ public class DepartmentController {
     this.repo = repo;
   }
 
-  public record DepartmentResponse(UUID id, String name, UUID branchId, Instant createdAt) {}
+  public record DepartmentResponse(
+      UUID id,
+      String name,
+      UUID branchId,
+      String phoneNumber,
+      String telegramUsername,
+      Long telegramChatId,
+      Instant createdAt
+  ) {}
 
   public record DepartmentPublicResponse(UUID id, String name) {}
 
   public record UpsertDepartmentRequest(
       @NotBlank @Size(max = 200) String name,
-      UUID branchId
+      UUID branchId,
+      @Size(max = 32) String phoneNumber,
+      @Size(max = 120) String telegramUsername,
+      Long telegramChatId
   ) {}
 
   @GetMapping
@@ -65,6 +76,9 @@ public class DepartmentController {
   @ResponseStatus(HttpStatus.CREATED)
   public DepartmentResponse create(@Valid @RequestBody UpsertDepartmentRequest req) {
     Department d = new Department(UUID.randomUUID(), req.name(), req.branchId(), Instant.now());
+    d.setPhoneNumber(normalize(req.phoneNumber(), 32));
+    d.setTelegramUsername(normalizeTelegramUsername(req.telegramUsername()));
+    d.setTelegramChatId(req.telegramChatId());
     repo.save(d);
     return toResponse(d);
   }
@@ -75,6 +89,9 @@ public class DepartmentController {
     Department d = repo.findById(id).orElseThrow(() -> new NotFoundException("Department not found"));
     d.setName(req.name());
     d.setBranchId(req.branchId());
+    d.setPhoneNumber(normalize(req.phoneNumber(), 32));
+    d.setTelegramUsername(normalizeTelegramUsername(req.telegramUsername()));
+    d.setTelegramChatId(req.telegramChatId());
     repo.save(d);
     return toResponse(d);
   }
@@ -90,7 +107,28 @@ public class DepartmentController {
   }
 
   private static DepartmentResponse toResponse(Department d) {
-    return new DepartmentResponse(d.getId(), d.getName(), d.getBranchId(), d.getCreatedAt());
+    return new DepartmentResponse(
+        d.getId(),
+        d.getName(),
+        d.getBranchId(),
+        d.getPhoneNumber(),
+        d.getTelegramUsername(),
+        d.getTelegramChatId(),
+        d.getCreatedAt()
+    );
+  }
+
+  private static String normalize(String raw, int maxLen) {
+    if (raw == null) return null;
+    String v = raw.trim();
+    if (v.isEmpty()) return null;
+    return v.length() <= maxLen ? v : v.substring(0, maxLen);
+  }
+
+  private static String normalizeTelegramUsername(String raw) {
+    String v = normalize(raw, 120);
+    if (v == null) return null;
+    if (v.startsWith("@")) v = v.substring(1);
+    return v.trim().isEmpty() ? null : v.trim();
   }
 }
-

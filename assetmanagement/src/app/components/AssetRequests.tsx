@@ -1,21 +1,32 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
-import { ClipboardList, Plus, RefreshCcw } from 'lucide-react';
+import { ClipboardList, Plus, RefreshCcw, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { useI18n } from '../i18n/I18nProvider';
 import { useAuth } from './AuthProvider';
 import { listCategories, getAvailableSummary } from '../lib/api/assets';
-import { createAssetRequest, getAssetRequestDemandSummary, listAssetRequests, listMyAssetRequests, cancelAssetRequest } from '../lib/api/requests';
+import {
+  createAssetRequest,
+  getAssetRequestDemandSummary,
+  listAssetRequests,
+  listMyAssetRequests,
+  cancelAssetRequest,
+  updateAssetRequestStatus,
+  fulfillAssetRequest,
+} from '../lib/api/requests';
 import type { AssetAvailableSummary, AssetCategory, AssetRequest, AssetRequestDemandSummary } from '../types';
 import { formatDateTime } from '../lib/utils';
 import { Button } from './ui/button';
+import { Checkbox } from './ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Textarea } from './ui/textarea';
+import { EmployeeSignupRequestsPanel } from './EmployeeSignupRequests';
 
 type CreateLine = { type: string; categoryCode: string; quantity: number };
+type RequestsTab = 'ASSETS' | 'EMPLOYEES';
 
 function statusBadge(status: string) {
   const base = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium';
@@ -33,6 +44,10 @@ export function AssetRequests() {
   const roles = user?.roles || [];
   const canManage = roles.some((r) => ['ADMIN', 'IT_ADMIN', 'ASSET_MANAGER', 'AUDITOR'].includes(r));
   const canCreate = roles.some((r) => ['EMPLOYEE', 'ADMIN', 'IT_ADMIN', 'ASSET_MANAGER'].includes(r));
+  const isAdmin = roles.includes('ADMIN');
+  const canDecide = roles.some((r) => ['ADMIN', 'IT_ADMIN', 'ASSET_MANAGER'].includes(r));
+
+  const [tab, setTab] = useState<RequestsTab>('ASSETS');
 
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<AssetCategory[]>([]);
@@ -85,9 +100,10 @@ export function AssetRequests() {
   };
 
   useEffect(() => {
+    if (tab !== 'ASSETS') return;
     void reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canManage]);
+  }, [canManage, tab]);
 
   const addLine = () => {
     setLines((prev) => prev.concat([{ type: '', categoryCode: prev[0]?.categoryCode || 'IT', quantity: 1 }]));
@@ -136,6 +152,66 @@ export function AssetRequests() {
     }
   };
 
+  const [decisionOpen, setDecisionOpen] = useState(false);
+  const [decisionKind, setDecisionKind] = useState<'approve' | 'reject'>('approve');
+  const [decisionTarget, setDecisionTarget] = useState<AssetRequest | null>(null);
+  const [decisionNote, setDecisionNote] = useState('');
+  const [decisionAutoFulfill, setDecisionAutoFulfill] = useState(true);
+  const [deciding, setDeciding] = useState(false);
+
+  const openDecision = (kind: 'approve' | 'reject', target: AssetRequest) => {
+    setDecisionKind(kind);
+    setDecisionTarget(target);
+    setDecisionNote('');
+    setDecisionAutoFulfill(kind === 'approve');
+    setDecisionOpen(true);
+  };
+
+  const submitDecision = async () => {
+    if (!decisionTarget) return;
+    setDeciding(true);
+    try {
+      if (decisionKind === 'approve') {
+        await updateAssetRequestStatus(decisionTarget.id, 'APPROVED', decisionNote || null);
+        toast.success(t('requests.approved'));
+        if (decisionAutoFulfill) {
+          const res = await fulfillAssetRequest(decisionTarget.id);
+          if (res.missing?.length) {
+            const msg = res.missing.map((m) => `${m.categoryCode}/${m.type} x${m.missingQuantity}`).join(', ');
+            toast.message(t('requests.fulfill.partial', { missing: msg }));
+          } else {
+            toast.success(t('requests.fulfilled'));
+          }
+        }
+      } else {
+        await updateAssetRequestStatus(decisionTarget.id, 'REJECTED', decisionNote || null);
+        toast.success(t('requests.rejected'));
+      }
+      setDecisionOpen(false);
+      setDecisionTarget(null);
+      await reload();
+    } catch (e: any) {
+      toast.error(e?.message || t('error.update'));
+    } finally {
+      setDeciding(false);
+    }
+  };
+
+  const fulfill = async (r: AssetRequest) => {
+    try {
+      const res = await fulfillAssetRequest(r.id);
+      if (res.missing?.length) {
+        const msg = res.missing.map((m) => `${m.categoryCode}/${m.type} x${m.missingQuantity}`).join(', ');
+        toast.message(t('requests.fulfill.partial', { missing: msg }));
+      } else {
+        toast.success(t('requests.fulfilled'));
+      }
+      await reload();
+    } catch (e: any) {
+      toast.error(e?.message || t('error.update'));
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -143,21 +219,40 @@ export function AssetRequests() {
           <h2 className="text-3xl font-bold text-gray-900">{t('page.requests.title')}</h2>
           <p className="text-gray-500 mt-1">{t('page.requests.subtitle')}</p>
         </div>
-        <div className="flex gap-3">
-          <Button variant="outline" onClick={reload} disabled={loading}>
-            <RefreshCcw className="w-4 h-4 mr-2" />
-            {t('action.refresh')}
+        {tab === 'ASSETS' && (
+          <div className="flex gap-3">
+            <Button variant="outline" onClick={reload} disabled={loading}>
+              <RefreshCcw className="w-4 h-4 mr-2" />
+              {t('action.refresh')}
+            </Button>
+            {canCreate && (
+              <Button onClick={() => setCreateOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                {t('requests.action.new')}
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button variant={tab === 'ASSETS' ? 'default' : 'outline'} size="sm" onClick={() => setTab('ASSETS')}>
+            <ClipboardList className="w-4 h-4 mr-2" />
+            {t('requests.tab.assets')}
           </Button>
-          {canCreate && (
-            <Button onClick={() => setCreateOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              {t('requests.action.new')}
+          {isAdmin && (
+            <Button variant={tab === 'EMPLOYEES' ? 'default' : 'outline'} size="sm" onClick={() => setTab('EMPLOYEES')}>
+              <UserPlus className="w-4 h-4 mr-2" />
+              {t('requests.tab.employees')}
             </Button>
           )}
         </div>
       </div>
 
-      {canManage && (
+      {tab === 'EMPLOYEES' && isAdmin ? <EmployeeSignupRequestsPanel embedded /> : null}
+
+      {tab === 'ASSETS' && canManage && (
         <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
@@ -228,123 +323,185 @@ export function AssetRequests() {
         </div>
       )}
 
-      <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-        <h3 className="text-lg font-semibold mb-4">{canManage ? t('requests.list.all') : t('requests.list.mine')}</h3>
-        {requests.length === 0 ? (
-          <p className="text-sm text-gray-500">{loading ? t('common.loading') : t('requests.list.empty')}</p>
-        ) : (
-          <div className="space-y-3">
-            {requests.map((r) => (
-              <div key={r.id} className="border border-gray-200 rounded-lg p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className={statusBadge(r.status)}>{t(`requestStatus.${r.status}`)}</span>
-                      <span className="text-xs text-gray-500">{formatDateTime(r.createdAt)}</span>
-                      {canManage && <span className="text-xs text-gray-400">- {r.requesterUsername}</span>}
-                    </div>
-                    <div className="text-sm text-gray-900 mt-2">
-                      {r.items.map((i) => `${i.categoryCode}/${i.type} x${i.quantity}`).join(', ')}
-                    </div>
-                    {r.note && <div className="text-sm text-gray-500 mt-1 whitespace-pre-line">{r.note}</div>}
-                  </div>
-                  {!canManage && user?.userId === r.requesterId && r.status === 'SUBMITTED' && (
-                    <Button variant="outline" size="sm" onClick={() => cancelMine(r)}>
-                      {t('requests.action.cancel')}
-                    </Button>
-                  )}
+      {tab === 'ASSETS' && (
+        <>
+          <Dialog open={decisionOpen} onOpenChange={setDecisionOpen}>
+            <DialogContent className="max-w-xl">
+              <DialogHeader>
+                <DialogTitle>
+                  {decisionKind === 'approve' ? t('requests.dialog.approveTitle') : t('requests.dialog.rejectTitle')}
+                </DialogTitle>
+                <DialogDescription>
+                  {decisionTarget ? `${decisionTarget.requesterUsername} - ${decisionTarget.id}` : ''}
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4">
+                <div>
+                  <Label>{t('requests.dialog.note')}</Label>
+                  <Textarea
+                    value={decisionNote}
+                    onChange={(e) => setDecisionNote(e.target.value)}
+                    rows={4}
+                    placeholder={t('requests.dialog.notePlaceholder')}
+                  />
                 </div>
+
+                {decisionKind === 'approve' && (
+                  <label className="flex items-center gap-2 text-sm text-gray-700 select-none">
+                    <Checkbox checked={decisionAutoFulfill} onCheckedChange={(v) => setDecisionAutoFulfill(Boolean(v))} />
+                    {t('requests.dialog.autoFulfill')}
+                  </label>
+                )}
               </div>
-            ))}
-          </div>
-        )}
-      </div>
 
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{t('requests.action.new')}</DialogTitle>
-            <DialogDescription>{t('requests.form.hint')}</DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-2">
-            <div>
-              <Label>{t('requests.form.note')}</Label>
-              <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} placeholder={t('requests.form.notePlaceholder')} />
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label>{t('requests.form.items')}</Label>
-                <Button type="button" variant="outline" size="sm" onClick={addLine}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  {t('requests.form.addItem')}
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setDecisionOpen(false)} disabled={deciding}>
+                  {t('common.cancel')}
                 </Button>
-              </div>
+                <Button onClick={submitDecision} disabled={deciding || !decisionTarget}>
+                  {decisionKind === 'approve' ? t('common.confirm') : t('common.reject')}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
-              {lines.map((l, idx) => (
-                <div key={idx} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-                  <div className="md:col-span-6">
-                    <Label>{t('asset.field.type')}</Label>
-                    <Input
-                      value={l.type}
-                      onChange={(e) => setLines((prev) => prev.map((x, i) => (i === idx ? { ...x, type: e.target.value } : x)))}
-                      placeholder="LAPTOP"
-                    />
-                  </div>
-                  <div className="md:col-span-4">
-                    <Label>{t('asset.field.category')}</Label>
-                    <Select
-                      value={l.categoryCode}
-                      onValueChange={(v) => setLines((prev) => prev.map((x, i) => (i === idx ? { ...x, categoryCode: v } : x)))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categories.map((c) => (
-                          <SelectItem key={c.code} value={c.code}>
-                            {c.name} ({c.code})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="md:col-span-2">
-                    <Label>{t('requests.form.qty')}</Label>
-                    <Input
-                      type="number"
-                      min={1}
-                      value={String(l.quantity)}
-                      onChange={(e) =>
-                        setLines((prev) =>
-                          prev.map((x, i) => (i === idx ? { ...x, quantity: Number(e.target.value || 1) } : x)),
-                        )
-                      }
-                    />
-                  </div>
-                  {lines.length > 1 && (
-                    <div className="md:col-span-12 flex justify-end">
-                      <Button type="button" variant="ghost" size="sm" onClick={() => removeLine(idx)}>
-                        {t('requests.form.removeItem')}
-                      </Button>
+          <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
+            <h3 className="text-lg font-semibold mb-4">{canManage ? t('requests.list.all') : t('requests.list.mine')}</h3>
+            {requests.length === 0 ? (
+              <p className="text-sm text-gray-500">{loading ? t('common.loading') : t('requests.list.empty')}</p>
+            ) : (
+              <div className="space-y-3">
+                {requests.map((r) => (
+                  <div key={r.id} className="border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className={statusBadge(r.status)}>{t(`requestStatus.${r.status}`)}</span>
+                          <span className="text-xs text-gray-500">{formatDateTime(r.createdAt)}</span>
+                          {canManage && <span className="text-xs text-gray-400">- {r.requesterUsername}</span>}
+                        </div>
+                        <div className="text-sm text-gray-900 mt-2">
+                          {r.items.map((i) => `${i.categoryCode}/${i.type} x${i.quantity}`).join(', ')}
+                        </div>
+                        {r.note && <div className="text-sm text-gray-500 mt-1 whitespace-pre-line">{r.note}</div>}
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {canDecide && r.status === 'SUBMITTED' && (
+                          <>
+                            <Button variant="outline" size="sm" onClick={() => openDecision('reject', r)}>
+                              {t('common.reject')}
+                            </Button>
+                            <Button size="sm" onClick={() => openDecision('approve', r)}>
+                              {t('common.confirm')}
+                            </Button>
+                          </>
+                        )}
+                        {canDecide && r.status === 'APPROVED' && (
+                          <Button variant="outline" size="sm" onClick={() => fulfill(r)}>
+                            {t('requests.action.fulfill')}
+                          </Button>
+                        )}
+                        {!canManage && user?.userId === r.requesterId && r.status === 'SUBMITTED' && (
+                          <Button variant="outline" size="sm" onClick={() => cancelMine(r)}>
+                            {t('requests.action.cancel')}
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                  )}
-                </div>
-              ))}
-            </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>
-              {t('common.cancel')}
-            </Button>
-            <Button onClick={submit} disabled={creating}>
-              {creating ? t('common.loading') : t('common.create')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>{t('requests.action.new')}</DialogTitle>
+                <DialogDescription>{t('requests.form.hint')}</DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 py-2">
+                <div>
+                  <Label>{t('requests.form.note')}</Label>
+                  <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} placeholder={t('requests.form.notePlaceholder')} />
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label>{t('requests.form.items')}</Label>
+                    <Button type="button" variant="outline" size="sm" onClick={addLine}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      {t('requests.form.addItem')}
+                    </Button>
+                  </div>
+
+                  {lines.map((l, idx) => (
+                    <div key={idx} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                      <div className="md:col-span-6">
+                        <Label>{t('asset.field.type')}</Label>
+                        <Input
+                          value={l.type}
+                          onChange={(e) => setLines((prev) => prev.map((x, i) => (i === idx ? { ...x, type: e.target.value } : x)))}
+                          placeholder="LAPTOP"
+                        />
+                      </div>
+                      <div className="md:col-span-4">
+                        <Label>{t('asset.field.category')}</Label>
+                        <Select
+                          value={l.categoryCode}
+                          onValueChange={(v) => setLines((prev) => prev.map((x, i) => (i === idx ? { ...x, categoryCode: v } : x)))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {categories.map((c) => (
+                              <SelectItem key={c.code} value={c.code}>
+                                {c.name} ({c.code})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="md:col-span-2">
+                        <Label>{t('requests.form.qty')}</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={String(l.quantity)}
+                          onChange={(e) =>
+                            setLines((prev) =>
+                              prev.map((x, i) => (i === idx ? { ...x, quantity: Number(e.target.value || 1) } : x)),
+                            )
+                          }
+                        />
+                      </div>
+                      {lines.length > 1 && (
+                        <div className="md:col-span-12 flex justify-end">
+                          <Button type="button" variant="ghost" size="sm" onClick={() => removeLine(idx)}>
+                            {t('requests.form.removeItem')}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setCreateOpen(false)}>
+                  {t('common.cancel')}
+                </Button>
+                <Button onClick={submit} disabled={creating}>
+                  {creating ? t('common.loading') : t('common.create')}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </>
+      )}
     </div>
   );
 }

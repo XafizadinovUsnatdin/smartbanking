@@ -17,6 +17,11 @@ function invalidateUsersCache() {
   usersInflight = null;
 }
 
+function invalidateDepartmentsCache() {
+  departmentsCache.clear();
+  departmentsInflight.clear();
+}
+
 export interface TokenResponse {
   accessToken: string;
   refreshToken: string;
@@ -94,6 +99,26 @@ export async function updateUserContacts(id: string, body: UpdateUserContactsReq
   return res;
 }
 
+export interface UpdateUserRequest {
+  fullName?: string | null;
+  jobTitle?: string | null;
+  departmentId?: string | null;
+  branchId?: string | null;
+  phoneNumber?: string | null;
+  telegramUsername?: string | null;
+  telegramUserId?: number | null;
+  telegramChatId?: number | null;
+}
+
+export async function updateUser(id: string, body: UpdateUserRequest): Promise<User> {
+  const res = await request<User>(`${apiBase.identity}/users/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  });
+  invalidateUsersCache();
+  return res;
+}
+
 export async function listBranches(): Promise<Branch[]> {
   const now = Date.now();
   if (branchesCache && branchesCache.expiresAt > now) {
@@ -137,6 +162,23 @@ export async function listDepartments(branchId?: string): Promise<Department[]> 
     });
   departmentsInflight.set(key, promise);
   return promise;
+}
+
+export interface UpsertDepartmentRequest {
+  name: string;
+  branchId?: string | null;
+  phoneNumber?: string | null;
+  telegramUsername?: string | null;
+  telegramChatId?: number | null;
+}
+
+export async function updateDepartment(id: string, body: UpsertDepartmentRequest): Promise<Department> {
+  const res = await request<Department>(`${apiBase.identity}/departments/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  });
+  invalidateDepartmentsCache();
+  return res;
 }
 
 export async function listEmployeeSignupRequests(status: EmployeeSignupRequestStatus = 'PENDING'): Promise<EmployeeSignupRequest[]> {

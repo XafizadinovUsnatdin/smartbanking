@@ -20,6 +20,15 @@ public class Department {
   @Column(name = "branch_id")
   private UUID branchId;
 
+  @Column(name = "phone_number", length = 32)
+  private String phoneNumber;
+
+  @Column(name = "telegram_username", length = 120)
+  private String telegramUsername;
+
+  @Column(name = "telegram_chat_id")
+  private Long telegramChatId;
+
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
@@ -35,9 +44,14 @@ public class Department {
   public UUID getId() { return id; }
   public String getName() { return name; }
   public UUID getBranchId() { return branchId; }
+  public String getPhoneNumber() { return phoneNumber; }
+  public String getTelegramUsername() { return telegramUsername; }
+  public Long getTelegramChatId() { return telegramChatId; }
   public Instant getCreatedAt() { return createdAt; }
 
   public void setName(String name) { this.name = name; }
   public void setBranchId(UUID branchId) { this.branchId = branchId; }
+  public void setPhoneNumber(String phoneNumber) { this.phoneNumber = phoneNumber; }
+  public void setTelegramUsername(String telegramUsername) { this.telegramUsername = telegramUsername; }
+  public void setTelegramChatId(Long telegramChatId) { this.telegramChatId = telegramChatId; }
 }
-

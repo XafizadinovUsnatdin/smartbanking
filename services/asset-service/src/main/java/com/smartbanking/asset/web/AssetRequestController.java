@@ -102,6 +102,19 @@ public class AssetRequestController {
     return requestService.updateStatus(id, req.status(), req.note(), actor(auth), null);
   }
 
+  public record FulfillResponse(
+      AssetRequestService.RequestView request,
+      List<UUID> assignedAssetIds,
+      List<AssetRequestService.MissingItem> missing
+  ) {}
+
+  @PostMapping("/{id}/fulfill")
+  @PreAuthorize("hasAnyRole('ADMIN','IT_ADMIN','ASSET_MANAGER')")
+  public FulfillResponse fulfill(@PathVariable UUID id, Authentication auth) {
+    var res = requestService.fulfill(id, actor(auth), null);
+    return new FulfillResponse(res.request(), res.assignedAssetIds(), res.missing());
+  }
+
   public record CancelRequest(@Size(max = 1000) String note) {}
 
   @PutMapping("/{id}/cancel")
@@ -136,4 +149,3 @@ public class AssetRequestController {
     }
   }
 }
-
