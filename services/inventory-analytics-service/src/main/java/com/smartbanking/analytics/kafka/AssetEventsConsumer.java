@@ -23,7 +23,11 @@ public class AssetEventsConsumer {
     this.categoryRepo = categoryRepo;
   }
 
-  @KafkaListener(topics = "${kafka.topics.asset-events:asset.events}", groupId = "analytics-service")
+  @KafkaListener(
+      topics = "${kafka.topics.asset-events:asset.events}",
+      groupId = "analytics-service",
+      autoStartup = "${kafka.listeners.enabled:true}"
+  )
   @Transactional
   public void onMessage(String json) throws Exception {
     EventEnvelope env = objectMapper.readValue(json, EventEnvelope.class);

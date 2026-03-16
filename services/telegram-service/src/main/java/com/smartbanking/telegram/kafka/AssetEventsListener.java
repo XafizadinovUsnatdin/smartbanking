@@ -30,7 +30,11 @@ public class AssetEventsListener {
     this.assets = assets;
   }
 
-  @KafkaListener(topics = "${kafka.topics.asset-events:asset.events}", groupId = "telegram-service")
+  @KafkaListener(
+      topics = "${kafka.topics.asset-events:asset.events}",
+      groupId = "telegram-service",
+      autoStartup = "${kafka.listeners.enabled:true}"
+  )
   public void onMessage(String json) throws Exception {
     if (!telegram.isEnabled()) return;
     if (json == null || json.isBlank()) return;
