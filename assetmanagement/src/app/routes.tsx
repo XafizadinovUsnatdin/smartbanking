@@ -92,6 +92,13 @@ export const router = createBrowserRouter([
           return { Component: mod.Users };
         },
       },
+      {
+        path: 'signup-requests',
+        lazy: async () => {
+          const mod = await import('./components/EmployeeSignupRequests');
+          return { Component: mod.EmployeeSignupRequests };
+        },
+      },
     ],
   },
 ]);

@@ -2,6 +2,7 @@ package com.smartbanking.telegram.clients;
 
 import com.smartbanking.telegram.clients.dto.IdentityUser;
 import com.smartbanking.telegram.security.ServiceAuth;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.Set;
 import java.util.List;
 import java.util.Optional;
@@ -90,6 +91,30 @@ public class IdentityClient {
         .retrieve()
         .body(IdentityUser.class);
   }
+
+  public SignupRequestResponse createEmployeeSignupRequest(CreateSignupRequest req) {
+    return http.post()
+        .uri("/employee-signup-requests")
+        .header(HttpHeaders.AUTHORIZATION, "Bearer " + serviceAuth.serviceToken())
+        .body(req)
+        .retrieve()
+        .body(SignupRequestResponse.class);
+  }
+
+  public record CreateSignupRequest(
+      String fullName,
+      String jobTitle,
+      String phoneNumber,
+      String telegramUsername,
+      Long telegramUserId,
+      Long telegramChatId
+  ) {}
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public record SignupRequestResponse(
+      UUID id,
+      String status
+  ) {}
 
   public CreatedUserResponse adminCreateUser(String bearerToken, AdminCreateUserRequest req) {
     return http.post()

@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation, Navigate } from 'react-router';
-import { LayoutDashboard, Package, History, QrCode, Menu, X, Building2, Tags, ClipboardList, Users } from 'lucide-react';
+import { LayoutDashboard, Package, History, QrCode, Menu, X, Building2, Tags, ClipboardList, Users, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from './AuthProvider';
 import { Button } from './ui/button';
@@ -16,12 +16,15 @@ export function RootLayout() {
     return <Navigate to={`/login?next=${next}`} replace />;
   }
 
-  const canManage = (user?.roles || []).some((r) => ['ADMIN', 'IT_ADMIN', 'ASSET_MANAGER'].includes(r));
+  const roles = user?.roles || [];
+  const canManage = roles.some((r) => ['ADMIN', 'IT_ADMIN', 'ASSET_MANAGER'].includes(r));
+  const isAdmin = roles.includes('ADMIN');
 
   const navItems = [
     { path: '/', icon: LayoutDashboard, label: t('nav.dashboard'), color: 'text-blue-500' },
     { path: '/assets', icon: Package, label: t('nav.assets'), color: 'text-indigo-500' },
     ...(canManage ? [{ path: '/users', icon: Users, label: t('nav.users'), color: 'text-sky-500' }] : []),
+    ...(isAdmin ? [{ path: '/signup-requests', icon: UserPlus, label: t('nav.signupRequests'), color: 'text-amber-500' }] : []),
     { path: '/requests', icon: ClipboardList, label: t('nav.requests'), color: 'text-violet-500' },
     ...(canManage ? [{ path: '/categories', icon: Tags, label: t('nav.categories'), color: 'text-emerald-500' }] : []),
     { path: '/audit', icon: History, label: t('nav.audit'), color: 'text-teal-500' },

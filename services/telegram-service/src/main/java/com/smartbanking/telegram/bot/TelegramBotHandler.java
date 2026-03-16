@@ -29,6 +29,7 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 
 @Component
 public class TelegramBotHandler {
@@ -302,8 +303,36 @@ public class TelegramBotHandler {
       return;
     }
 
+    UUID requestId;
+    try {
+      var created = identity.createEmployeeSignupRequest(new IdentityClient.CreateSignupRequest(
+          fullName,
+          jobTitle,
+          phone,
+          normalizeTelegramUsername(wizard.telegramUsername()),
+          wizard.telegramUserId(),
+          chatId
+      ));
+      requestId = created == null ? null : created.id();
+      if (requestId == null) {
+        telegram.answerCallbackQuery(cb.id(), "Xatolik");
+        telegram.sendMessage(chatId, "So'rov yuborishda xatolik. Keyinroq urinib ko'ring.");
+        return;
+      }
+    } catch (HttpClientErrorException.Conflict e) {
+      telegram.answerCallbackQuery(cb.id(), "Yuborilgan");
+      telegram.sendMessage(chatId, "So'rov avval yuborilgan. Tasdiqlanishi kutilmoqda.");
+      state.deleteSignupWizard(chatId);
+      return;
+    } catch (Exception e) {
+      log.warn("Employee signup request create failed chatId={}", chatId, e);
+      telegram.answerCallbackQuery(cb.id(), "Xatolik");
+      telegram.sendMessage(chatId, "So'rov yuborishda xatolik. Keyinroq urinib ko'ring.");
+      return;
+    }
+
     SignupRequest req = new SignupRequest(
-        UUID.randomUUID(),
+        requestId,
         chatId,
         wizard.telegramUserId(),
         normalizeTelegramUsername(wizard.telegramUsername()),
@@ -316,9 +345,7 @@ public class TelegramBotHandler {
     state.deleteSignupWizard(chatId);
 
     telegram.answerCallbackQuery(cb.id(), "Yuborildi");
-    telegram.sendMessage(chatId, "So'rov adminga yuborildi. Tasdiqlanishi kutilmoqda.");
-
-    notifyAdminsSignup(req);
+    telegram.sendMessage(chatId, "So'rov adminga yuborildi. Admin panelda ko'rib chiqiladi.");
   }
 
   private void notifyAdminsSignup(SignupRequest req) {

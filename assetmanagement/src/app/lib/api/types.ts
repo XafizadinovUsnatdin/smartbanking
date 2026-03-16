@@ -15,6 +15,7 @@ export interface User {
   id: string;
   username: string;
   fullName: string;
+  jobTitle?: string | null;
   departmentId?: string | null;
   branchId?: string | null;
   phoneNumber?: string | null;
@@ -23,6 +24,24 @@ export interface User {
   telegramChatId?: number | null;
   roles: Role[];
   createdAt: string;
+}
+
+export type EmployeeSignupRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export interface EmployeeSignupRequest {
+  id: string;
+  fullName: string;
+  jobTitle: string;
+  phoneNumber: string;
+  telegramUsername?: string | null;
+  telegramUserId: number;
+  telegramChatId: number;
+  status: EmployeeSignupRequestStatus;
+  createdAt: string;
+  decidedAt?: string | null;
+  decidedBy?: string | null;
+  decisionNote?: string | null;
+  createdUserId?: string | null;
 }
 
 export interface Branch {

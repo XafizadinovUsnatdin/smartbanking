@@ -51,6 +51,7 @@ This repo includes a Telegram bot integration (`telegram-service`) for:
 - periodic "are your devices working?" checks (default: every 30 days)
 - employee asset requests via bot (`/request`)
 - admin approval flow for "not working" reports
+- new employee signup requests (shown in the admin UI: `Employee requests`)
 
 Setup (do **not** commit the token):
 

@@ -1,5 +1,5 @@
 import { apiBase, request } from './client';
-import type { Branch, Department, Role, User } from './types';
+import type { Branch, Department, EmployeeSignupRequest, EmployeeSignupRequestStatus, Role, User } from './types';
 
 const CACHE_TTL_MS = 60_000;
 
@@ -137,4 +137,26 @@ export async function listDepartments(branchId?: string): Promise<Department[]> 
     });
   departmentsInflight.set(key, promise);
   return promise;
+}
+
+export async function listEmployeeSignupRequests(status: EmployeeSignupRequestStatus = 'PENDING'): Promise<EmployeeSignupRequest[]> {
+  const url = `${apiBase.identity}/employee-signup-requests?status=${encodeURIComponent(status)}`;
+  return request<EmployeeSignupRequest[]>(url);
+}
+
+export async function approveEmployeeSignupRequest(id: string, note?: string | null): Promise<EmployeeSignupRequest> {
+  const res = await request<EmployeeSignupRequest>(`${apiBase.identity}/employee-signup-requests/${encodeURIComponent(id)}/approve`, {
+    method: 'POST',
+    body: JSON.stringify(note ? { note } : {}),
+  });
+  invalidateUsersCache();
+  return res;
+}
+
+export async function rejectEmployeeSignupRequest(id: string, note?: string | null): Promise<EmployeeSignupRequest> {
+  const res = await request<EmployeeSignupRequest>(`${apiBase.identity}/employee-signup-requests/${encodeURIComponent(id)}/reject`, {
+    method: 'POST',
+    body: JSON.stringify(note ? { note } : {}),
+  });
+  return res;
 }
