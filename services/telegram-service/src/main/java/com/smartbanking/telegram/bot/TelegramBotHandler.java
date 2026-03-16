@@ -1083,7 +1083,8 @@ public class TelegramBotHandler {
     return "Buyruqlar:\n"
         + "/start - akkauntni bog'lash + aktivlar\n"
         + "/myassets - biriktirilgan aktivlar\n"
-        + "/request IT LAPTOP 1 - aktiv so'rovi\n"
+        + "/request - aktiv so'rovi (tugmalar orqali)\n"
+        + "/cancel - bekor qilish\n"
         + "/help - yordam";
   }
 }

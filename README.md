@@ -78,4 +78,4 @@ Config (optional):
 Docker Desktop stores its Linux disk image on **C:** by default (this can grow when building images).
 
 - Quick cleanup (safe): `docker builder prune -af`
-- Move Docker disk image to **D:**: Docker Desktop → **Settings** → **Resources** → **Advanced** → **Disk image location** → choose a folder on `D:\` → Apply & Restart
+- Move Docker disk image to **D:**: Docker Desktop -> Settings -> Resources -> Advanced -> Disk image location -> choose a folder on `D:\` -> Apply & Restart
