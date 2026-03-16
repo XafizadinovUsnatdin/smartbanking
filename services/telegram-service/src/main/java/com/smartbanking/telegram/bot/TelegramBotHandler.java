@@ -141,12 +141,12 @@ public class TelegramBotHandler {
     if (!terminal) {
       kb = new InlineKeyboardMarkup(List.of(
           List.of(
-              new InlineKeyboardButton("Ishlayapti ✅", "chk:ok:" + asset.id()),
-              new InlineKeyboardButton("Ta'mirda 🛠️", "iss:repair:" + asset.id())
+              new InlineKeyboardButton("Ishlayapti", "chk:ok:" + asset.id()),
+              new InlineKeyboardButton("Tamirtalab", "iss:repair:" + asset.id())
           ),
           List.of(
-              new InlineKeyboardButton("Yo'qolgan ❗", "iss:lost:" + asset.id()),
-              new InlineKeyboardButton("Buzilgan ⚠️", "iss:broken:" + asset.id())
+              new InlineKeyboardButton("Yo'qolgan вќ—", "iss:lost:" + asset.id()),
+              new InlineKeyboardButton("Buzilgan вљ пёЏ", "iss:broken:" + asset.id())
           )
       ));
     }
@@ -221,7 +221,7 @@ public class TelegramBotHandler {
       telegram.answerCallbackQuery(cb.id(), "Tanlang");
       if (assetId != null) {
         InlineKeyboardMarkup kb = new InlineKeyboardMarkup(List.of(
-            List.of(new InlineKeyboardButton("Ta'mirda", "iss:repair:" + assetId)),
+            List.of(new InlineKeyboardButton("Tamirtalab", "iss:repair:" + assetId)),
             List.of(new InlineKeyboardButton("Yo'qolgan", "iss:lost:" + assetId)),
             List.of(new InlineKeyboardButton("Buzilgan", "iss:broken:" + assetId))
         ));
@@ -274,7 +274,7 @@ public class TelegramBotHandler {
       requestedLabel = "Buzilgan";
     } else {
       requestedStatus = "IN_REPAIR";
-      requestedLabel = "Ta'mirda";
+      requestedLabel = "Tamirtalab";
     }
 
     Asset asset;
@@ -435,3 +435,4 @@ public class TelegramBotHandler {
         + "/help - yordam";
   }
 }
+
