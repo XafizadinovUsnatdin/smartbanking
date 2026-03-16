@@ -51,6 +51,14 @@ public class AssetClient {
         .body(new ParameterizedTypeReference<PageResponse<AssignedAsset>>() {});
   }
 
+  public List<AssetCategory> listCategories() {
+    return http.get()
+        .uri("/asset-categories")
+        .header(HttpHeaders.AUTHORIZATION, "Bearer " + serviceAuth.serviceToken())
+        .retrieve()
+        .body(new ParameterizedTypeReference<List<AssetCategory>>() {});
+  }
+
   public Optional<AssetAssignment> currentAssignment(UUID assetId) {
     try {
       var entity = http.get()
@@ -89,4 +97,6 @@ public class AssetClient {
   public record CreateAssetRequest(String note, List<CreateAssetRequestItem> items) {}
 
   public record CreateAssetRequestItem(String type, String categoryCode, int quantity) {}
+
+  public record AssetCategory(String code, String name) {}
 }

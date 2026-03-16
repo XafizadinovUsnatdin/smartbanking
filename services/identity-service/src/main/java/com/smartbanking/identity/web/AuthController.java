@@ -57,6 +57,7 @@ public class AuthController {
         req.fullName(),
         null,
         null,
+        null,
         Instant.now(),
         null,
         null,
@@ -110,13 +111,14 @@ public class AuthController {
         req.username(),
         passwordEncoder.encode(req.password()),
         req.fullName(),
+        normalize(req.jobTitle(), 120),
         req.departmentId(),
         req.branchId(),
         Instant.now(),
-        null,
-        null,
-        null,
-        null,
+        normalize(req.phoneNumber(), 32),
+        normalizeTelegramUsername(req.telegramUsername()),
+        req.telegramUserId(),
+        req.telegramChatId(),
         req.roles()
     );
     userRepo.save(user);
@@ -127,8 +129,28 @@ public class AuthController {
       @NotBlank @Size(max = 120) String username,
       @NotBlank @Size(min = 8, max = 100) String password,
       @NotBlank @Size(max = 200) String fullName,
+      @Size(max = 32) String phoneNumber,
+      @Size(max = 120) String telegramUsername,
+      Long telegramUserId,
+      Long telegramChatId,
+      @Size(max = 120) String jobTitle,
       UUID departmentId,
       UUID branchId,
       Set<Role> roles
   ) {}
+
+  private static String normalize(String raw, int maxLen) {
+    if (raw == null) return null;
+    String v = raw.trim();
+    if (v.isEmpty()) return null;
+    return v.length() <= maxLen ? v : v.substring(0, maxLen);
+  }
+
+  private static String normalizeTelegramUsername(String raw) {
+    String v = normalize(raw, 120);
+    if (v == null) return null;
+    if (v.startsWith("@")) v = v.substring(1);
+    v = v.trim();
+    return v.isEmpty() ? null : v;
+  }
 }

@@ -31,6 +31,9 @@ public class UserAccount {
   @Column(name = "full_name", nullable = false, length = 200)
   private String fullName;
 
+  @Column(name = "job_title", length = 120)
+  private String jobTitle;
+
   @Column(name = "department_id")
   private UUID departmentId;
 
@@ -65,6 +68,7 @@ public class UserAccount {
       String username,
       String passwordHash,
       String fullName,
+      String jobTitle,
       UUID departmentId,
       UUID branchId,
       Instant createdAt,
@@ -78,6 +82,7 @@ public class UserAccount {
     this.username = username;
     this.passwordHash = passwordHash;
     this.fullName = fullName;
+    this.jobTitle = jobTitle;
     this.departmentId = departmentId;
     this.branchId = branchId;
     this.createdAt = createdAt;
@@ -92,6 +97,7 @@ public class UserAccount {
   public String getUsername() { return username; }
   public String getPasswordHash() { return passwordHash; }
   public String getFullName() { return fullName; }
+  public String getJobTitle() { return jobTitle; }
   public UUID getDepartmentId() { return departmentId; }
   public UUID getBranchId() { return branchId; }
   public Instant getCreatedAt() { return createdAt; }
@@ -103,6 +109,7 @@ public class UserAccount {
 
   public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
   public void setFullName(String fullName) { this.fullName = fullName; }
+  public void setJobTitle(String jobTitle) { this.jobTitle = jobTitle; }
   public void setDepartmentId(UUID departmentId) { this.departmentId = departmentId; }
   public void setBranchId(UUID branchId) { this.branchId = branchId; }
   public void setPhoneNumber(String phoneNumber) { this.phoneNumber = phoneNumber; }

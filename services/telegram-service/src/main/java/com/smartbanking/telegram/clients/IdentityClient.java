@@ -2,6 +2,7 @@ package com.smartbanking.telegram.clients;
 
 import com.smartbanking.telegram.clients.dto.IdentityUser;
 import com.smartbanking.telegram.security.ServiceAuth;
+import java.util.Set;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -89,6 +90,31 @@ public class IdentityClient {
         .retrieve()
         .body(IdentityUser.class);
   }
+
+  public CreatedUserResponse adminCreateUser(String bearerToken, AdminCreateUserRequest req) {
+    return http.post()
+        .uri("/auth/admin/create-user")
+        .header(HttpHeaders.AUTHORIZATION, "Bearer " + bearerToken)
+        .body(req)
+        .retrieve()
+        .body(CreatedUserResponse.class);
+  }
+
+  public record AdminCreateUserRequest(
+      String username,
+      String password,
+      String fullName,
+      String phoneNumber,
+      String telegramUsername,
+      Long telegramUserId,
+      Long telegramChatId,
+      String jobTitle,
+      UUID departmentId,
+      UUID branchId,
+      Set<String> roles
+  ) {}
+
+  public record CreatedUserResponse(UUID id, String username, String fullName, Set<String> roles) {}
 
   public record UpdateContactsRequest(
       String phoneNumber,
