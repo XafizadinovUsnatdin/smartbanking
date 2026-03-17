@@ -1,6 +1,5 @@
 package com.smartbanking.telegram.bot;
 
-import com.smartbanking.telegram.bot.BotStateRepository.IssueReport;
 import com.smartbanking.telegram.bot.BotStateRepository.AssetRequestWizard;
 import com.smartbanking.telegram.bot.BotStateRepository.RequestWizardStep;
 import com.smartbanking.telegram.bot.BotStateRepository.SignupRequest;
@@ -12,6 +11,7 @@ import com.smartbanking.telegram.clients.AssetClient.CreateAssetRequestItem;
 import com.smartbanking.telegram.clients.IdentityClient;
 import com.smartbanking.telegram.clients.dto.Asset;
 import com.smartbanking.telegram.clients.dto.AssignedAsset;
+import com.smartbanking.telegram.clients.dto.AssetPhoto;
 import com.smartbanking.telegram.clients.dto.IdentityUser;
 import com.smartbanking.telegram.clients.dto.PageResponse;
 import com.smartbanking.telegram.security.ServiceAuth;
@@ -112,8 +112,7 @@ public class TelegramBotHandler {
       return;
     }
     IdentityUser user = userOpt.get();
-    telegram.sendMessage(chatId, "Assalomu alaykum, " + safe(user.fullName()) + ".\n\nSizga biriktirilgan aktivlar ro'yxati quyida. "
-        + "Status o'zgartirish so'rovlari admin tomonidan tasdiqlanadi.");
+    telegram.sendMessage(chatId, "Assalomu alaykum, " + safe(user.fullName()) + ".\n\nSizga biriktirilgan aktivlar ro'yxati quyida.");
     sendMyAssetsWithActions(chatId, user);
     telegram.sendMessage(chatId, helpText());
   }
@@ -537,6 +536,20 @@ public class TelegramBotHandler {
       ));
     }
 
+    try {
+      List<AssetPhoto> photos = assets.listPhotos(asset.id());
+      AssetPhoto first = photos == null || photos.isEmpty() ? null : photos.get(0);
+      if (first != null) {
+        var download = assets.downloadPhoto(first.id());
+        if (download != null && download.bytes().length > 0) {
+          telegram.sendPhoto(chatId, download.bytes(), first.filename(), text, kb);
+          return;
+        }
+      }
+    } catch (Exception e) {
+      log.debug("Bot photo send failed assetId={}", asset.id(), e);
+    }
+
     telegram.sendMessage(chatId, text, kb);
   }
 
@@ -890,9 +903,6 @@ public class TelegramBotHandler {
       onIssueReported(cb, data);
       return;
     }
-    if (data.startsWith("adm:")) {
-      onAdminDecision(cb, data);
-    }
   }
 
   private void onIssueReported(TelegramModels.CallbackQuery cb, String data) {
@@ -942,105 +952,24 @@ public class TelegramBotHandler {
       return;
     }
 
-    UUID reportId = UUID.randomUUID();
-    IssueReport report = new IssueReport(
-        reportId,
-        assetId,
-        reporter.id(),
-        chatId,
-        reporter.fullName(),
-        requestedStatus,
-        requestedLabel,
-        Instant.now()
-    );
-    state.saveIssue(report);
-
-    telegram.answerCallbackQuery(cb.id(), "Yuborildi");
-    telegram.sendMessage(chatId, "Xabaringiz adminga yuborildi. Tasdiqlangach status yangilanadi.");
-
-    notifyAdmins(report, asset);
-  }
-
-  private void notifyAdmins(IssueReport report, Asset asset) {
-    List<IdentityUser> all = identity.listUsers();
-    if (all == null || all.isEmpty()) return;
-    String text = "Xodim muammo yubordi:\n"
-        + "- Xodim: " + safe(report.reporterFullName()) + "\n"
-        + "- Aktiv: " + safe(asset.name()) + " (" + safe(asset.serialNumber()) + ")\n"
-        + "- Holat: " + safe(report.requestedLabel()) + "\n\n"
-        + "Tasdiqlaysizmi?";
-
-    InlineKeyboardMarkup kb = new InlineKeyboardMarkup(List.of(
-        List.of(
-            new InlineKeyboardButton("Tasdiqlash", "adm:approve:" + report.id()),
-            new InlineKeyboardButton("Rad etish", "adm:reject:" + report.id())
-        )
-    ));
-
-    for (IdentityUser u : all) {
-      if (u == null || u.telegramChatId() == null) continue;
-      if (!isManager(u)) continue;
-      if (report.reporterUserId() != null && report.reporterUserId().equals(u.id())) continue;
-      if (report.reporterChatId() != null && report.reporterChatId().equals(u.telegramChatId())) continue;
-      telegram.sendMessage(u.telegramChatId(), text, kb);
+    String tg = reporter.telegramUsername();
+    if (tg == null || tg.isBlank()) {
+      tg = reporter.telegramUserId() == null ? "unknown" : "id:" + reporter.telegramUserId();
+    } else {
+      tg = "@" + tg.trim().replaceFirst("^@", "");
     }
-  }
-
-  private void onAdminDecision(TelegramModels.CallbackQuery cb, String data) {
-    long chatId = cb.message().chat().id();
-    TelegramModels.From from = cb.from();
-    Optional<IdentityUser> adminOpt = resolveAndLink(from, chatId);
-    if (adminOpt.isEmpty() || !isManager(adminOpt.get())) {
-      telegram.answerCallbackQuery(cb.id(), "Ruxsat yo'q");
-      return;
-    }
-    IdentityUser admin = adminOpt.get();
-
-    String[] parts = data.split(":", 3);
-    if (parts.length < 3) return;
-    String action = parts[1];
-    UUID reportId = parseUuid(parts[2]);
-    if (reportId == null) return;
-
-    Optional<IssueReport> reportOpt = state.getIssue(reportId);
-    if (reportOpt.isEmpty()) {
-      telegram.answerCallbackQuery(cb.id(), "Topilmadi");
-      return;
-    }
-    IssueReport report = reportOpt.get();
-
-    Asset asset;
-    try {
-      asset = assets.getAsset(report.assetId());
-    } catch (Exception e) {
-      telegram.answerCallbackQuery(cb.id(), "Aktiv topilmadi");
-      state.deleteIssue(reportId);
-      return;
-    }
-
-    if ("reject".equals(action)) {
-      telegram.answerCallbackQuery(cb.id(), "Rad etildi");
-      if (report.reporterChatId() != null) {
-        telegram.sendMessage(report.reporterChatId(), "Admin xabaringizni rad etdi: " + safe(asset.name()));
-      }
-      state.deleteIssue(reportId);
-      return;
-    }
+    String reason = "Telegram bot: "
+        + safe(reporter.fullName())
+        + " (" + tg + ")"
+        + " -> " + requestedLabel;
 
     try {
-      String token = auth.asUserToken(admin.id(), admin.username(), admin.roles());
-      String reason = "Telegram: " + safe(report.reporterFullName()) + " qurilma ishlamayapti (" + safe(report.requestedLabel()) + ")";
-      assets.changeStatusAs(report.assetId(), report.requestedStatus(), reason, token);
-      telegram.answerCallbackQuery(cb.id(), "Tasdiqlandi");
-      telegram.sendMessage(chatId, "Tasdiqlandi: " + safe(asset.name()) + " -> " + report.requestedStatus());
-      if (report.reporterChatId() != null) {
-        telegram.sendMessage(report.reporterChatId(), "Admin tasdiqladi: " + safe(asset.name()) + " holati yangilandi.");
-      }
+      assets.changeStatusAs(assetId, requestedStatus, reason, auth.serviceToken());
+      telegram.answerCallbackQuery(cb.id(), "Yangilandi");
+      telegram.sendMessage(chatId, "Status yangilandi: " + safe(asset.name()) + " -> " + requestedLabel);
     } catch (Exception e) {
       telegram.answerCallbackQuery(cb.id(), "Xatolik");
-      telegram.sendMessage(chatId, "Status yangilashda xatolik: " + e.getMessage());
-    } finally {
-      state.deleteIssue(reportId);
+      telegram.sendMessage(chatId, "Status yangilashda xatolik. Keyinroq urinib ko'ring.");
     }
   }
 

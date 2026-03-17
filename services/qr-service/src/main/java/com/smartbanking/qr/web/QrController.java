@@ -21,6 +21,8 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -87,6 +89,20 @@ public class QrController {
       @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization
   ) {
     return viewService.view(token, authorization);
+  }
+
+  @GetMapping("/qr/photos/{photoId}")
+  public ResponseEntity<byte[]> photo(@PathVariable UUID photoId) {
+    var res = viewService.downloadPhoto(photoId);
+    MediaType mt;
+    try {
+      mt = MediaType.parseMediaType(res.contentType());
+    } catch (Exception e) {
+      mt = MediaType.APPLICATION_OCTET_STREAM;
+    }
+    return ResponseEntity.ok()
+        .contentType(mt)
+        .body(res.bytes());
   }
 
   private String buildQrPayload(String token) {

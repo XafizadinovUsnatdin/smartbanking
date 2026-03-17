@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { Building, Package, User } from 'lucide-react';
 import { toast } from 'sonner';
-import { viewQr } from '../lib/api/qr';
-import { downloadPhotoBlob, listCategories } from '../lib/api/assets';
+import { downloadQrPhoto, viewQr } from '../lib/api/qr';
+import { listCategories } from '../lib/api/assets';
 import type { QrAssetView } from '../lib/api/qr';
 import type { AssetCategory } from '../types';
 import { formatDate, formatDateTime, statusColors } from '../lib/utils';
@@ -58,7 +58,7 @@ export function QrPublicView() {
       const urls: Record<string, string> = {};
       try {
         for (const p of result.photos) {
-          const blob = await downloadPhotoBlob(p);
+          const blob = await downloadQrPhoto(p.id);
           urls[p.id] = URL.createObjectURL(blob);
         }
       } catch {

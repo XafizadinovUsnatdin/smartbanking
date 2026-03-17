@@ -6,9 +6,9 @@ import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.ResponseEntity;
 import com.smartbanking.qr.security.ServiceTokenProvider;
 import org.springframework.stereotype.Service;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestClient;
 
 @Service
@@ -86,7 +86,20 @@ public class QrViewService {
     return new QrAssetView(asset, owner, photos == null ? List.of() : photos);
   }
 
+  public PhotoDownload downloadPhoto(UUID photoId) {
+    String auth = "Bearer " + tokenProvider.issue();
+    ResponseEntity<byte[]> resp = assetClient.get()
+        .uri("/assets/photos/{id}", photoId)
+        .header(HttpHeaders.AUTHORIZATION, auth)
+        .retrieve()
+        .toEntity(byte[].class);
+    byte[] body = resp.getBody() == null ? new byte[0] : resp.getBody();
+    String contentType = resp.getHeaders().getContentType() == null ? "application/octet-stream" : resp.getHeaders().getContentType().toString();
+    return new PhotoDownload(body, contentType);
+  }
+
   public record QrAssetView(AssetDto asset, OwnerDto owner, List<PhotoDto> photos) {}
+  public record PhotoDownload(byte[] bytes, String contentType) {}
 
   public record AssetDto(
       UUID id,

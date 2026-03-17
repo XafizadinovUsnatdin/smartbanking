@@ -3,6 +3,7 @@ package com.smartbanking.telegram.clients;
 import com.smartbanking.telegram.clients.dto.Asset;
 import com.smartbanking.telegram.clients.dto.AssetAssignment;
 import com.smartbanking.telegram.clients.dto.AssignedAsset;
+import com.smartbanking.telegram.clients.dto.AssetPhoto;
 import com.smartbanking.telegram.clients.dto.PageResponse;
 import com.smartbanking.telegram.security.ServiceAuth;
 import java.util.List;
@@ -13,6 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
@@ -59,6 +61,27 @@ public class AssetClient {
         .body(new ParameterizedTypeReference<List<AssetCategory>>() {});
   }
 
+  public List<AssetPhoto> listPhotos(UUID assetId) {
+    return http.get()
+        .uri("/assets/{id}/photos", assetId)
+        .header(HttpHeaders.AUTHORIZATION, "Bearer " + serviceAuth.serviceToken())
+        .retrieve()
+        .body(new ParameterizedTypeReference<List<AssetPhoto>>() {});
+  }
+
+  public PhotoDownload downloadPhoto(UUID photoId) {
+    ResponseEntity<byte[]> resp = http.get()
+        .uri("/assets/photos/{id}", photoId)
+        .header(HttpHeaders.AUTHORIZATION, "Bearer " + serviceAuth.serviceToken())
+        .retrieve()
+        .toEntity(byte[].class);
+    byte[] body = resp.getBody() == null ? new byte[0] : resp.getBody();
+    String contentType = resp.getHeaders().getContentType() == null
+        ? "application/octet-stream"
+        : resp.getHeaders().getContentType().toString();
+    return new PhotoDownload(body, contentType);
+  }
+
   public Optional<AssetAssignment> currentAssignment(UUID assetId) {
     try {
       var entity = http.get()
@@ -97,6 +120,8 @@ public class AssetClient {
   public record CreateAssetRequest(String note, List<CreateAssetRequestItem> items) {}
 
   public record CreateAssetRequestItem(String type, String categoryCode, int quantity) {}
+
+  public record PhotoDownload(byte[] bytes, String contentType) {}
 
   public record AssetCategory(String code, String name) {}
 }

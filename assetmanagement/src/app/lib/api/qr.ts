@@ -1,4 +1,4 @@
-import { apiBase, request } from './client';
+import { apiBase, request, requestBlob } from './client';
 import type { Asset, AssetPhoto, OwnerType } from './types';
 
 export interface QrGenerateResponse {
@@ -53,4 +53,10 @@ export async function bulkAssetQrTokens(assetIds: string[]): Promise<BulkAssetQr
     method: 'POST',
     body: JSON.stringify({ assetIds }),
   });
+}
+
+export async function downloadQrPhoto(photoId: string): Promise<Blob> {
+  const base = apiBase.qr.replace(/\/+$/, '');
+  const root = base.endsWith('/qr') ? base : `${base}/qr`;
+  return requestBlob(`${root}/photos/${encodeURIComponent(photoId)}`, {}, false);
 }
