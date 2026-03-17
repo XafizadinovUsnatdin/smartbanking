@@ -28,6 +28,7 @@ export async function searchAudit(params: AuditSearchParams = {}): Promise<Sprin
   if (params.to) qs.set('to', params.to);
   if (typeof params.page === 'number') qs.set('page', String(params.page));
   if (typeof params.size === 'number') qs.set('size', String(params.size));
-  return request<SpringPage<AuditLog>>(`${apiBase.audit}/audit?${qs.toString()}`);
+  const base = apiBase.audit.replace(/\/+$/, '');
+  const endpoint = base.endsWith('/audit') ? `${base}?${qs.toString()}` : `${base}/audit?${qs.toString()}`;
+  return request<SpringPage<AuditLog>>(endpoint);
 }
-

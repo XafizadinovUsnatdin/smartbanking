@@ -7,7 +7,9 @@ export interface QrGenerateResponse {
 }
 
 export async function generateAssetQr(assetId: string): Promise<QrGenerateResponse> {
-  return request<QrGenerateResponse>(`${apiBase.qr}/qr/assets/${assetId}`, { method: 'POST' });
+  const base = apiBase.qr.replace(/\/+$/, '');
+  const root = base.endsWith('/qr') ? base : `${base}/qr`;
+  return request<QrGenerateResponse>(`${root}/assets/${assetId}`, { method: 'POST' });
 }
 
 export interface QrLookupResponse {
@@ -15,7 +17,9 @@ export interface QrLookupResponse {
 }
 
 export async function lookupQr(token: string): Promise<QrLookupResponse> {
-  return request<QrLookupResponse>(`${apiBase.qr}/qr/${encodeURIComponent(token)}`);
+  const base = apiBase.qr.replace(/\/+$/, '');
+  const root = base.endsWith('/qr') ? base : `${base}/qr`;
+  return request<QrLookupResponse>(`${root}/${encodeURIComponent(token)}`);
 }
 
 export interface QrOwnerView {
@@ -31,7 +35,9 @@ export interface QrAssetView {
 }
 
 export async function viewQr(token: string): Promise<QrAssetView> {
-  return request<QrAssetView>(`${apiBase.qr}/qr/${encodeURIComponent(token)}/view`);
+  const base = apiBase.qr.replace(/\/+$/, '');
+  const root = base.endsWith('/qr') ? base : `${base}/qr`;
+  return request<QrAssetView>(`${root}/${encodeURIComponent(token)}/view`);
 }
 
 export interface BulkAssetQrTokenResponse {
@@ -41,7 +47,9 @@ export interface BulkAssetQrTokenResponse {
 }
 
 export async function bulkAssetQrTokens(assetIds: string[]): Promise<BulkAssetQrTokenResponse[]> {
-  return request<BulkAssetQrTokenResponse[]>(`${apiBase.qr}/qr/assets/tokens`, {
+  const base = apiBase.qr.replace(/\/+$/, '');
+  const root = base.endsWith('/qr') ? base : `${base}/qr`;
+  return request<BulkAssetQrTokenResponse[]>(`${root}/assets/tokens`, {
     method: 'POST',
     body: JSON.stringify({ assetIds }),
   });
