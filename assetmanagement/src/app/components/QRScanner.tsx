@@ -7,7 +7,7 @@ import { viewQr } from '../lib/api/qr';
 import { downloadPhotoBlob, listCategories } from '../lib/api/assets';
 import type { QrAssetView } from '../lib/api/qr';
 import type { AssetCategory } from '../types';
-import { statusColors } from '../lib/utils';
+import { formatDate, formatDateTime, statusColors } from '../lib/utils';
 import { useI18n } from '../i18n/I18nProvider';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
@@ -337,18 +337,48 @@ export function QRScanner() {
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <p className="text-sm text-gray-500">{t('asset.field.type')}</p>
-                    <p className="font-medium mt-1">{asset.type}</p>
+                    <p className="font-medium mt-1">{asset.type || '-'}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">{t('asset.field.category')}</p>
-                    <p className="font-medium mt-1">{categoryByCode[asset.categoryCode]?.name || asset.categoryCode}</p>
+                    <p className="font-medium mt-1">{categoryByCode[asset.categoryCode]?.name || asset.categoryCode || '-'}</p>
                   </div>
-                  {asset.description && (
-                    <div className="col-span-2">
-                      <p className="text-sm text-gray-500">{t('asset.field.description')}</p>
-                      <p className="font-medium mt-1">{asset.description}</p>
-                    </div>
-                  )}
+                  <div>
+                    <p className="text-sm text-gray-500">{t('asset.field.inventoryTag')}</p>
+                    <p className="font-medium mt-1">{asset.inventoryTag || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">{t('asset.field.model')}</p>
+                    <p className="font-medium mt-1">{asset.model || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">{t('asset.field.vendor')}</p>
+                    <p className="font-medium mt-1">{asset.vendor || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">{t('asset.field.cost')}</p>
+                    <p className="font-medium mt-1">{asset.cost ?? '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">{t('asset.field.purchaseDate')}</p>
+                    <p className="font-medium mt-1">{asset.purchaseDate ? formatDate(asset.purchaseDate) : '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">{t('asset.field.warrantyUntil')}</p>
+                    <p className="font-medium mt-1">{asset.warrantyUntil ? formatDate(asset.warrantyUntil) : '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">{t('asset.field.createdAt')}</p>
+                    <p className="font-medium mt-1">{asset.createdAt ? formatDateTime(asset.createdAt) : '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">{t('asset.field.updatedAt')}</p>
+                    <p className="font-medium mt-1">{asset.updatedAt ? formatDateTime(asset.updatedAt) : '-'}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="text-sm text-gray-500">{t('asset.field.description')}</p>
+                    <p className="font-medium mt-1 whitespace-pre-line">{asset.description || '-'}</p>
+                  </div>
                 </div>
               </div>
 
