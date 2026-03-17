@@ -4,8 +4,7 @@ import { Download, Package, Plus, QrCode, Search, Printer } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { toast } from 'sonner';
 import { bulkAssetQrTokens } from '../lib/api/qr';
-import { downloadAssetPhotoByUrl, listAgingAssets, listAssets, listCategories, listCurrentAssignments, listLatestPhotos } from '../lib/api/assets';
-import { getDashboardAnalytics } from '../lib/api/analytics';
+import { downloadAssetPhotoByUrl, getAssetSummary, listAgingAssets, listAssets, listCategories, listCurrentAssignments, listLatestPhotos } from '../lib/api/assets';
 import { listBranches, listDepartments, listUsers } from '../lib/api/identity';
 import type { Asset, AssetAssignment, AssetCategory, AssetStatus, Branch, Department, User } from '../types';
 import { formatDate, statusColors } from '../lib/utils';
@@ -120,7 +119,7 @@ export function AssetList() {
           listUsers(),
           listBranches(),
           listDepartments(),
-          getDashboardAnalytics(),
+          getAssetSummary(),
         ]);
 
         if (catsRes.status === 'fulfilled') setCategories(catsRes.value);

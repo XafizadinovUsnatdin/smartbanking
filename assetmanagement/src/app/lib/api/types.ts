@@ -24,6 +24,7 @@ export interface User {
   telegramChatId?: number | null;
   roles: Role[];
   createdAt: string;
+  lastLoginAt?: string | null;
 }
 
 export type EmployeeSignupRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED';

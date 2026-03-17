@@ -55,6 +55,22 @@ public class AssetService {
     this.outbox = outbox;
   }
 
+  public record AssetStatusCount(AssetStatus status, long count) {}
+
+  public record AssetCategoryCount(String categoryCode, long count) {}
+
+  public record AssetSummary(List<AssetStatusCount> byStatus, List<AssetCategoryCount> byCategory) {}
+
+  public AssetSummary summary() {
+    var byStatus = assetRepo.statusSummary().stream()
+        .map(r -> new AssetStatusCount(r.getStatus(), r.getCount()))
+        .toList();
+    var byCategory = assetRepo.categorySummary().stream()
+        .map(r -> new AssetCategoryCount(r.getCategoryCode(), r.getCount()))
+        .toList();
+    return new AssetSummary(byStatus, byCategory);
+  }
+
   @Transactional
   public Asset create(CreateAssetRequest req, String actor, String correlationId) {
     if (!categoryRepo.existsById(req.categoryCode())) {

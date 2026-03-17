@@ -63,6 +63,7 @@ public class AuthController {
         null,
         null,
         null,
+        null,
         Set.of(Role.ADMIN)
     );
     userRepo.save(user);
@@ -75,6 +76,8 @@ public class AuthController {
     if (!passwordEncoder.matches(req.password(), user.getPasswordHash())) {
       throw new UnauthorizedException("Invalid credentials");
     }
+    user.setLastLoginAt(Instant.now());
+    userRepo.save(user);
     return new TokenResponse(
         jwtService.issueAccessToken(user.getId(), user.getUsername(), user.getRoles()),
         jwtService.issueRefreshToken(user.getId(), user.getUsername(), user.getRoles())
@@ -115,6 +118,7 @@ public class AuthController {
         req.departmentId(),
         req.branchId(),
         Instant.now(),
+        null,
         normalize(req.phoneNumber(), 32),
         normalizeTelegramUsername(req.telegramUsername()),
         req.telegramUserId(),

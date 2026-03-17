@@ -9,6 +9,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -39,15 +40,38 @@ public class UserController {
       Long telegramUserId,
       Long telegramChatId,
       List<Role> roles,
-      Instant createdAt
+      Instant createdAt,
+      Instant lastLoginAt
   ) {}
 
   public record UserPublicResponse(UUID id, String fullName) {}
+
+  public record MeResponse(UserResponse user, Instant serverTime) {}
 
   @GetMapping
   @PreAuthorize("hasAnyRole('ADMIN','IT_ADMIN','ASSET_MANAGER','AUDITOR')")
   public List<UserResponse> list() {
     return repo.findAll().stream().map(UserController::toResponse).toList();
+  }
+
+  @GetMapping("/me")
+  @PreAuthorize("isAuthenticated()")
+  public MeResponse me() {
+    String principal = String.valueOf(SecurityContextHolder.getContext().getAuthentication().getPrincipal());
+    // JwtAuthFilter sets principal as "userId:username"
+    String userIdPart = principal;
+    int idx = principal.indexOf(':');
+    if (idx > 0) {
+      userIdPart = principal.substring(0, idx);
+    }
+    UUID id;
+    try {
+      id = UUID.fromString(userIdPart);
+    } catch (Exception e) {
+      throw new UnauthorizedException("Invalid session");
+    }
+    UserAccount user = repo.findById(id).orElseThrow(() -> new UnauthorizedException("User not found"));
+    return new MeResponse(toResponse(user), Instant.now());
   }
 
   @GetMapping("/{id}")
@@ -172,7 +196,8 @@ public class UserController {
         u.getTelegramUserId(),
         u.getTelegramChatId(),
         u.getRoles().stream().toList(),
-        u.getCreatedAt()
+        u.getCreatedAt(),
+        u.getLastLoginAt()
     );
   }
 

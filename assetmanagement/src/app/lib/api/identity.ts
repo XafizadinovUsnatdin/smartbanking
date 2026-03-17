@@ -34,6 +34,15 @@ export async function login(username: string, password: string): Promise<TokenRe
   });
 }
 
+export interface MeResponse {
+  user: User;
+  serverTime: string;
+}
+
+export async function getMe(): Promise<MeResponse> {
+  return request<MeResponse>(`${apiBase.identity}/users/me`);
+}
+
 export async function registerFirstAdmin(username: string, password: string, fullName: string): Promise<void> {
   await request<void>(`${apiBase.identity}/auth/register`, {
     method: 'POST',

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useLocation } from 'react-router';
 import { ClipboardList, Plus, RefreshCcw, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { useI18n } from '../i18n/I18nProvider';
@@ -40,6 +40,7 @@ function statusBadge(status: string) {
 
 export function AssetRequests() {
   const { t } = useI18n();
+  const location = useLocation();
   const { user } = useAuth();
   const roles = user?.roles || [];
   const canManage = roles.some((r) => ['ADMIN', 'IT_ADMIN', 'ASSET_MANAGER', 'AUDITOR'].includes(r));
@@ -48,6 +49,29 @@ export function AssetRequests() {
   const canDecide = roles.some((r) => ['ADMIN', 'IT_ADMIN', 'ASSET_MANAGER'].includes(r));
 
   const [tab, setTab] = useState<RequestsTab>('ASSETS');
+  const [focusAssetRequestId, setFocusAssetRequestId] = useState<string | null>(null);
+  const [focusSignupRequestId, setFocusSignupRequestId] = useState<string | null>(null);
+  const [flashId, setFlashId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const qs = new URLSearchParams(location.search);
+    const tabParam = qs.get('tab');
+    const assetId = qs.get('requestId');
+    const signupId = qs.get('signupRequestId');
+
+    if (tabParam === 'EMPLOYEES' && isAdmin) {
+      setTab('EMPLOYEES');
+    } else if (tabParam === 'ASSETS') {
+      setTab('ASSETS');
+    } else if (signupId && isAdmin) {
+      setTab('EMPLOYEES');
+    } else if (assetId) {
+      setTab('ASSETS');
+    }
+
+    setFocusAssetRequestId(assetId);
+    setFocusSignupRequestId(signupId);
+  }, [location.search, isAdmin]);
 
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<AssetCategory[]>([]);
@@ -104,6 +128,18 @@ export function AssetRequests() {
     void reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canManage, tab]);
+
+  useEffect(() => {
+    if (tab !== 'ASSETS') return;
+    if (!focusAssetRequestId) return;
+    if (loading) return;
+    const el = document.getElementById(`asset-req-${focusAssetRequestId}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setFlashId(focusAssetRequestId);
+    const id = window.setTimeout(() => setFlashId(null), 2500);
+    return () => window.clearTimeout(id);
+  }, [tab, focusAssetRequestId, loading, requests]);
 
   const addLine = () => {
     setLines((prev) => prev.concat([{ type: '', categoryCode: prev[0]?.categoryCode || 'IT', quantity: 1 }]));
@@ -250,7 +286,7 @@ export function AssetRequests() {
         </div>
       </div>
 
-      {tab === 'EMPLOYEES' && isAdmin ? <EmployeeSignupRequestsPanel embedded /> : null}
+      {tab === 'EMPLOYEES' && isAdmin ? <EmployeeSignupRequestsPanel embedded focusId={focusSignupRequestId} /> : null}
 
       {tab === 'ASSETS' && canManage && (
         <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
@@ -373,7 +409,13 @@ export function AssetRequests() {
             ) : (
               <div className="space-y-3">
                 {requests.map((r) => (
-                  <div key={r.id} className="border border-gray-200 rounded-lg p-4">
+                  <div
+                    key={r.id}
+                    id={`asset-req-${r.id}`}
+                    className={`border rounded-lg p-4 transition-colors ${
+                      flashId === r.id ? 'border-indigo-300 bg-indigo-50/40 ring-2 ring-indigo-200' : 'border-gray-200'
+                    }`}
+                  >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">

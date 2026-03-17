@@ -1,0 +1,25 @@
+FROM node:20-alpine AS build
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY . .
+
+ARG VITE_IDENTITY_API
+ARG VITE_ASSET_API
+ARG VITE_AUDIT_API
+ARG VITE_QR_API
+ARG VITE_ANALYTICS_API
+
+ENV VITE_IDENTITY_API=$VITE_IDENTITY_API
+ENV VITE_ASSET_API=$VITE_ASSET_API
+ENV VITE_AUDIT_API=$VITE_AUDIT_API
+ENV VITE_QR_API=$VITE_QR_API
+ENV VITE_ANALYTICS_API=$VITE_ANALYTICS_API
+
+RUN npm run build
+
+FROM nginx:1.27-alpine
+COPY ./nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/dist /usr/share/nginx/html

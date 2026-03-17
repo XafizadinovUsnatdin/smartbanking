@@ -1,8 +1,8 @@
 param(
   [switch]$Build,
-  [string]$AdminUsername = "admin",
-  [string]$AdminPassword = "Admin1234!",
-  [string]$AdminFullName = "System Admin"
+  [string]$AdminUsername = $(if ($env:BOOTSTRAP_ADMIN_USERNAME) { $env:BOOTSTRAP_ADMIN_USERNAME } else { "admin" }),
+  [string]$AdminPassword = $(if ($env:BOOTSTRAP_ADMIN_PASSWORD) { $env:BOOTSTRAP_ADMIN_PASSWORD } else { "Admin1234!" }),
+  [string]$AdminFullName = $(if ($env:BOOTSTRAP_ADMIN_FULL_NAME) { $env:BOOTSTRAP_ADMIN_FULL_NAME } else { "System Admin" })
 )
 
 $ErrorActionPreference = "Stop"

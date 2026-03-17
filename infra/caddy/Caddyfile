@@ -1,0 +1,27 @@
+{
+  email {$CADDY_EMAIL}
+}
+
+identity.{$PUBLIC_DOMAIN} {
+  reverse_proxy identity-service:8081
+}
+
+asset.{$PUBLIC_DOMAIN} {
+  reverse_proxy asset-service:8082
+}
+
+audit.{$PUBLIC_DOMAIN} {
+  reverse_proxy audit-service:8083
+}
+
+qr.{$PUBLIC_DOMAIN} {
+  reverse_proxy qr-service:8084
+}
+
+analytics.{$PUBLIC_DOMAIN} {
+  reverse_proxy inventory-analytics-service:8085
+}
+
+app.{$PUBLIC_DOMAIN} {
+  reverse_proxy ui:80
+}

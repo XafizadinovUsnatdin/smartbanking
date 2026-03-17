@@ -66,6 +66,7 @@ public class BootstrapAdmin implements ApplicationRunner {
         null,
         null,
         null,
+        null,
         Set.of(Role.ADMIN)
     );
     userRepo.save(user);

@@ -20,7 +20,7 @@ function statusBadge(status: EmployeeSignupRequestStatus) {
   return `${base} bg-gray-100 text-gray-700`;
 }
 
-export function EmployeeSignupRequestsPanel({ embedded = false }: { embedded?: boolean }) {
+export function EmployeeSignupRequestsPanel({ embedded = false, focusId = null }: { embedded?: boolean; focusId?: string | null }) {
   const { t } = useI18n();
   const { user } = useAuth();
   const roles = user?.roles || [];
@@ -29,6 +29,7 @@ export function EmployeeSignupRequestsPanel({ embedded = false }: { embedded?: b
   const [status, setStatus] = useState<EmployeeSignupRequestStatus>('PENDING');
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<EmployeeSignupRequest[]>([]);
+  const [flashId, setFlashId] = useState<string | null>(null);
 
   const reload = async () => {
     if (!isAdmin) return;
@@ -47,6 +48,22 @@ export function EmployeeSignupRequestsPanel({ embedded = false }: { embedded?: b
     void reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin, status]);
+
+  useEffect(() => {
+    if (!focusId) return;
+    setStatus('PENDING');
+  }, [focusId]);
+
+  useEffect(() => {
+    if (!focusId) return;
+    if (loading) return;
+    const el = document.getElementById(`signup-req-${focusId}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setFlashId(focusId);
+    const id = window.setTimeout(() => setFlashId(null), 2500);
+    return () => window.clearTimeout(id);
+  }, [focusId, loading, items]);
 
   const totalCount = useMemo(() => items.length, [items]);
 
@@ -162,7 +179,11 @@ export function EmployeeSignupRequestsPanel({ embedded = false }: { embedded?: b
                 {items.map((r) => {
                   const tg = r.telegramUsername ? `@${String(r.telegramUsername).replace(/^@/, '')}` : `id:${r.telegramUserId}`;
                   return (
-                    <tr key={r.id} className="hover:bg-gray-50">
+                    <tr
+                      key={r.id}
+                      id={`signup-req-${r.id}`}
+                      className={flashId === r.id ? 'bg-sky-50 ring-1 ring-sky-200' : 'hover:bg-gray-50'}
+                    >
                       <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">{formatDateTime(r.createdAt)}</td>
                       <td className="px-4 py-3 text-sm text-gray-900">
                         <div className="font-medium">{r.fullName}</div>

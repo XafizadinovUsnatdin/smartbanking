@@ -1,0 +1,43 @@
+services:
+  identity-service:
+    environment:
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+
+  asset-service:
+    environment:
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+
+  audit-service:
+    environment:
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+
+  qr-service:
+    environment:
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+      # For global UI (Vercel/Cloudflare Pages), set this to your UI URL (or keep empty to encode token-only QR).
+      QR_PAYLOAD_BASE_URL: ${QR_PAYLOAD_BASE_URL:-}
+
+  inventory-analytics-service:
+    environment:
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+
+  api-gateway:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - identity-service
+      - asset-service
+      - audit-service
+      - qr-service
+      - inventory-analytics-service
+    ports:
+      - "18080:8080"
+    volumes:
+      - ./infra/caddy/Caddyfile.tunnel:/etc/caddy/Caddyfile:ro
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    depends_on:
+      - api-gateway
+    command: ["tunnel", "--no-autoupdate", "--url", "http://api-gateway:8080"]

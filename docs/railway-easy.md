@@ -1,4 +1,4 @@
-# Railway deploy (easy mode) — no Kafka (UZ / EN)
+# Railway deploy (easy mode) - no Kafka (UZ / EN)
 
 This guide deploys the **core** backend to Railway with the least moving parts:
 - `identity-service` (auth/users)
@@ -8,19 +8,19 @@ This guide deploys the **core** backend to Railway with the least moving parts:
 Optional:
 - `telegram-service` (bot polling + checks). Kafka-based notifications can be disabled.
 
-Kafka-driven services (`audit-service`, `inventory-analytics-service`) are optional in this “easy mode”.
+Kafka-driven services (`audit-service`, `inventory-analytics-service`) are optional in this "easy mode".
 
 ---
 
-## UZ — Eng oson yo‘l (Kafka’siz)
+## UZ - Eng oson yo'l (Kafka'siz)
 
-### 1) Railway’da infra qo‘shing
+### 1) Railway'da infra qo'shing
 Railway Project ichida:
-- Add → Database → **PostgreSQL**
-- Add → Database → **Redis**
+- Add -> Database -> **PostgreSQL**
+- Add -> Database -> **Redis**
 
-### 2) Postgres schema’larni yarating (1 marta)
-Railway → Postgres → Query/Console:
+### 2) Postgres schema'larni yarating (1 marta)
+Railway -> Postgres -> Query/Console:
 ```sql
 CREATE SCHEMA IF NOT EXISTS identity;
 CREATE SCHEMA IF NOT EXISTS asset;
@@ -28,8 +28,8 @@ CREATE SCHEMA IF NOT EXISTS audit;
 CREATE SCHEMA IF NOT EXISTS analytics;
 ```
 
-### 3) Servislarni Railway’ga deploy qiling (Dockerfile)
-Har bir servis uchun: Add Service → GitHub Repo → `smartbanking`
+### 3) Servislarni Railway'ga deploy qiling (Dockerfile)
+Har bir servis uchun: Add Service -> GitHub Repo -> `smartbanking`
 
 Build settings:
 - Builder: **Dockerfile**
@@ -39,7 +39,7 @@ Build settings:
   - `services/asset-service/Dockerfile`
   - `services/qr-service/Dockerfile`
 
-### 4) ENV sozlash (muqim)
+### 4) ENV sozlash (muhim)
 Hamma servislar uchun:
 - `JWT_SECRET` = kuchli secret (hammasida bir xil)
 - `CORS_ALLOWED_ORIGINS` = `https://<frontend-domain>`
@@ -62,7 +62,7 @@ Hamma servislar uchun:
 - `SPRING_FLYWAY_TABLE=flyway_asset`
 - `REDIS_HOST=<redis-host>`
 - `REDIS_PORT=<redis-port>`
-- Kafka’siz ishlashi uchun:
+- Kafka'siz ishlashi uchun:
   - `OUTBOX_PUBLISHER_ENABLED=false`
 
 `qr-service`:
@@ -72,7 +72,7 @@ Hamma servislar uchun:
 - `IDENTITY_API_BASE=https://<identity-service-public-url>`
 - `QR_PAYLOAD_BASE_URL=https://<frontend-domain>/scanner`
 
-### 5) (Ixtiyoriy) telegram-service (Kafka’siz)
+### 5) (Ixtiyoriy) telegram-service (Kafka'siz)
 Deploy: `services/telegram-service/Dockerfile`
 
 ENV:
@@ -80,7 +80,7 @@ ENV:
 - `REDIS_HOST`, `REDIS_PORT`
 - `IDENTITY_API_BASE=https://<identity-url>`
 - `ASSET_API_BASE=https://<asset-url>`
-- Kafka listeners’ni o‘chirish:
+- Kafka listeners'ni o'chirish:
   - `KAFKA_LISTENERS_ENABLED=false`
 
 ### 6) Tekshirish
@@ -95,15 +95,15 @@ Swagger:
 
 ---
 
-## EN — Easy mode (without Kafka)
+## EN - Easy mode (without Kafka)
 
 ### 1) Add infra
 Inside your Railway project:
-- Add → Database → **PostgreSQL**
-- Add → Database → **Redis**
+- Add -> Database -> **PostgreSQL**
+- Add -> Database -> **Redis**
 
 ### 2) Create schemas (once)
-Railway → Postgres → Query/Console:
+Railway -> Postgres -> Query/Console:
 ```sql
 CREATE SCHEMA IF NOT EXISTS identity;
 CREATE SCHEMA IF NOT EXISTS asset;
@@ -148,4 +148,3 @@ All services:
 
 Optional `telegram-service` (no Kafka):
 - `KAFKA_LISTENERS_ENABLED=false`
-

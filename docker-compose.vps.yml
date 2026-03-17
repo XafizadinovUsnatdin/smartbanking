@@ -1,0 +1,89 @@
+services:
+  # Expose only 80/443 on the VPS. Everything else stays inside the Docker network.
+  postgres:
+    ports: []
+
+  redis:
+    ports: []
+
+  zookeeper:
+    ports: []
+
+  kafka:
+    ports: []
+
+  identity-service:
+    ports: []
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      BOOTSTRAP_ADMIN_USERNAME: ${BOOTSTRAP_ADMIN_USERNAME:-admin}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-Admin1234!}
+      BOOTSTRAP_ADMIN_FULL_NAME: ${BOOTSTRAP_ADMIN_FULL_NAME:-System Admin}
+
+  asset-service:
+    ports: []
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+
+  audit-service:
+    ports: []
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+
+  qr-service:
+    ports: []
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      QR_SECRET: ${QR_SECRET}
+      QR_PAYLOAD_BASE_URL: ${QR_PAYLOAD_BASE_URL}
+
+  inventory-analytics-service:
+    ports: []
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+
+  telegram-service:
+    ports: []
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      KAFKA_LISTENERS_ENABLED: ${KAFKA_LISTENERS_ENABLED:-true}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHECK_PERIOD_DAYS: ${TELEGRAM_CHECK_PERIOD_DAYS:-30}
+
+  ui:
+    build:
+      context: ./assetmanagement
+      dockerfile: Dockerfile
+      args:
+        VITE_IDENTITY_API: https://identity.${PUBLIC_DOMAIN}
+        VITE_ASSET_API: https://asset.${PUBLIC_DOMAIN}
+        VITE_AUDIT_API: https://audit.${PUBLIC_DOMAIN}
+        VITE_QR_API: https://qr.${PUBLIC_DOMAIN}
+        VITE_ANALYTICS_API: https://analytics.${PUBLIC_DOMAIN}
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - ui
+      - identity-service
+      - asset-service
+      - audit-service
+      - qr-service
+      - inventory-analytics-service
+    environment:
+      PUBLIC_DOMAIN: ${PUBLIC_DOMAIN}
+      CADDY_EMAIL: ${CADDY_EMAIL}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./.data/caddy/data:/data
+      - ./.data/caddy/config:/config

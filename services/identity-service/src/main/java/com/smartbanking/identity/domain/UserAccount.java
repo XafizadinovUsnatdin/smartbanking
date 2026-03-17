@@ -43,6 +43,9 @@ public class UserAccount {
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
+  @Column(name = "last_login_at")
+  private Instant lastLoginAt;
+
   @Column(name = "phone_number", length = 32)
   private String phoneNumber;
 
@@ -72,6 +75,7 @@ public class UserAccount {
       UUID departmentId,
       UUID branchId,
       Instant createdAt,
+      Instant lastLoginAt,
       String phoneNumber,
       String telegramUsername,
       Long telegramUserId,
@@ -86,6 +90,7 @@ public class UserAccount {
     this.departmentId = departmentId;
     this.branchId = branchId;
     this.createdAt = createdAt;
+    this.lastLoginAt = lastLoginAt;
     this.phoneNumber = phoneNumber;
     this.telegramUsername = telegramUsername;
     this.telegramUserId = telegramUserId;
@@ -101,6 +106,7 @@ public class UserAccount {
   public UUID getDepartmentId() { return departmentId; }
   public UUID getBranchId() { return branchId; }
   public Instant getCreatedAt() { return createdAt; }
+  public Instant getLastLoginAt() { return lastLoginAt; }
   public String getPhoneNumber() { return phoneNumber; }
   public String getTelegramUsername() { return telegramUsername; }
   public Long getTelegramUserId() { return telegramUserId; }
@@ -112,6 +118,7 @@ public class UserAccount {
   public void setJobTitle(String jobTitle) { this.jobTitle = jobTitle; }
   public void setDepartmentId(UUID departmentId) { this.departmentId = departmentId; }
   public void setBranchId(UUID branchId) { this.branchId = branchId; }
+  public void setLastLoginAt(Instant lastLoginAt) { this.lastLoginAt = lastLoginAt; }
   public void setPhoneNumber(String phoneNumber) { this.phoneNumber = phoneNumber; }
   public void setTelegramUsername(String telegramUsername) { this.telegramUsername = telegramUsername; }
   public void setTelegramUserId(Long telegramUserId) { this.telegramUserId = telegramUserId; }

@@ -64,6 +64,7 @@ Variant A (tavsiya): VPS + Docker Compose
 - `.env` yarating (JWT secret, DB creds, Telegram token).
 - `docker compose up -d --build`
 - Frontend-ni Vercel/Cloudflare-da, backend-ni VPS-da ishlating.
+- Batafsil: `docs/vps-docker-compose.md`
 
 Variant B: Railway (services) + managed Kafka
 - Railway-ga PostgreSQL va Redis qo'shing.
@@ -73,7 +74,7 @@ Variant B: Railway (services) + managed Kafka
   - `DB_URL`, `DB_USER`, `DB_PASS`
   - `KAFKA_BOOTSTRAP`
   - `JWT_SECRET`
-  - `APP_CORS_ALLOWED_ORIGINS=https://<your-frontend-domain>`
+  - `CORS_ALLOWED_ORIGINS=https://<your-frontend-domain>`
   - `REDIS_HOST`, `REDIS_PORT` (telegram-service uchun)
   - `TELEGRAM_BOT_TOKEN` (telegram-service uchun)
 
@@ -89,9 +90,8 @@ Recommended:
 
 ### UZ
 Frontend domeni o'zgarsa, barcha backend servislar uchun:
-- `APP_CORS_ALLOWED_ORIGINS=https://your-frontend-domain`
+- `CORS_ALLOWED_ORIGINS=https://your-frontend-domain`
 ni moslab qo'ying.
 
 ### EN
-Set `APP_CORS_ALLOWED_ORIGINS=https://your-frontend-domain` on all backend services.
-
+Set `CORS_ALLOWED_ORIGINS=https://your-frontend-domain` on all backend services.

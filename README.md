@@ -80,3 +80,23 @@ Docker Desktop stores its Linux disk image on **C:** by default (this can grow w
 
 - Quick cleanup (safe): `docker builder prune -af`
 - Move Docker disk image to **D:**: Docker Desktop -> Settings -> Resources -> Advanced -> Disk image location -> choose a folder on `D:\` -> Apply & Restart
+
+## Expose your laptop backend to the internet (Cloudflare quick tunnel)
+
+If your frontend is deployed (e.g. Vercel) and you want to make your **local** backend reachable globally **while your laptop is ON**, you can use a Cloudflare quick tunnel:
+
+1. Start backend + tunnel:
+   - `docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up -d --build`
+2. Read the public URL:
+   - `docker compose -f docker-compose.yml -f docker-compose.tunnel.yml logs -f cloudflared`
+   - Look for a `https://<something>.trycloudflare.com` URL
+3. Set Vercel env vars (Asset UI project):
+   - `VITE_IDENTITY_API=https://<tunnel>/identity`
+   - `VITE_ASSET_API=https://<tunnel>/asset`
+   - `VITE_AUDIT_API=https://<tunnel>`
+   - `VITE_QR_API=https://<tunnel>`
+   - `VITE_ANALYTICS_API=https://<tunnel>`
+4. Also update backend CORS (local `.env` used by docker compose):
+   - `CORS_ALLOWED_ORIGINS=https://assettracing.vercel.app,http://localhost:5173`
+
+Note: the quick tunnel URL can change if you stop/restart `cloudflared`. For a stable URL, use a real domain with Cloudflare Tunnel.

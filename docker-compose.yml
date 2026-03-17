@@ -83,10 +83,10 @@ services:
       DB_URL: jdbc:postgresql://postgres:5432/identity_db
       DB_USER: smartbanking
       DB_PASS: smartbanking
-      JWT_SECRET: change-me-change-me-change-me-change-me-32b
-      BOOTSTRAP_ADMIN_USERNAME: admin
-      BOOTSTRAP_ADMIN_PASSWORD: Admin1234!
-      BOOTSTRAP_ADMIN_FULL_NAME: System Admin
+      JWT_SECRET: ${JWT_SECRET:-change-me-change-me-change-me-change-me-32b}
+      BOOTSTRAP_ADMIN_USERNAME: ${BOOTSTRAP_ADMIN_USERNAME:-admin}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-Admin1234!}
+      BOOTSTRAP_ADMIN_FULL_NAME: ${BOOTSTRAP_ADMIN_FULL_NAME:-System Admin}
     restart: unless-stopped
     ports:
       - "8081:8081"
@@ -109,7 +109,7 @@ services:
       DB_PASS: smartbanking
       KAFKA_BOOTSTRAP: kafka:9092
       REDIS_HOST: redis
-      JWT_SECRET: change-me-change-me-change-me-change-me-32b
+      JWT_SECRET: ${JWT_SECRET:-change-me-change-me-change-me-change-me-32b}
     restart: unless-stopped
     ports:
       - "8082:8082"
@@ -144,9 +144,9 @@ services:
       - redis
     environment:
       REDIS_HOST: redis
-      QR_SECRET: change-me-change-me-change-me-change-me-32b
-      QR_PAYLOAD_BASE_URL: http://localhost:5173
-      JWT_SECRET: change-me-change-me-change-me-change-me-32b
+      QR_SECRET: ${QR_SECRET:-change-me-change-me-change-me-change-me-32b}
+      QR_PAYLOAD_BASE_URL: ${QR_PAYLOAD_BASE_URL:-http://localhost:5173}
+      JWT_SECRET: ${JWT_SECRET:-change-me-change-me-change-me-change-me-32b}
       ASSET_API_BASE: http://asset-service:8082
       IDENTITY_API_BASE: http://identity-service:8081
     restart: unless-stopped
@@ -189,7 +189,7 @@ services:
     environment:
       KAFKA_BOOTSTRAP: kafka:9092
       REDIS_HOST: redis
-      JWT_SECRET: change-me-change-me-change-me-change-me-32b
+      JWT_SECRET: ${JWT_SECRET:-change-me-change-me-change-me-change-me-32b}
       IDENTITY_API_BASE: http://identity-service:8081
       ASSET_API_BASE: http://asset-service:8082
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}

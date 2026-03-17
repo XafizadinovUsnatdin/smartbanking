@@ -18,6 +18,77 @@ function safeJson(json: string): any | null {
   }
 }
 
+function fmtStatus(code: string, t: (k: string, params?: any) => string) {
+  if (!code) return '';
+  return t(`status.${code}`);
+}
+
+function fmtOwner(ownerType: string, ownerId: string, t: (k: string, params?: any) => string) {
+  if (!ownerType || !ownerId) return '';
+  return `${t(`ownerType.${ownerType}`)} ${ownerId}`;
+}
+
+function humanizeAudit(eventType: string, p: any, t: (k: string, params?: any) => string): string {
+  const serial = String(p?.serialNumber || '');
+  const assetName = String(p?.name || '');
+  const fromStatus = p?.fromStatus ? String(p.fromStatus) : '';
+  const toStatus = p?.toStatus ? String(p.toStatus) : '';
+  const ownerType = p?.ownerType ? String(p.ownerType) : '';
+  const ownerId = p?.ownerId ? String(p.ownerId) : '';
+  const requestStatus = p?.status ? String(p.status) : '';
+  const requesterUsername = p?.requesterUsername ? String(p.requesterUsername) : '';
+
+  switch (eventType) {
+    case 'AssetCreated':
+      return t('audit.human.assetCreated', { name: assetName || serial || '-', serial: serial || '-' });
+    case 'AssetUpdated':
+      return t('audit.human.assetUpdated', { name: assetName || serial || '-', serial: serial || '-' });
+    case 'AssetDeleted':
+      return t('audit.human.assetDeleted', { name: assetName || serial || '-', serial: serial || '-' });
+    case 'AssetAssigned':
+      return t('audit.human.assetAssigned', {
+        name: assetName || serial || '-',
+        serial: serial || '-',
+        owner: fmtOwner(ownerType, ownerId, t) || '-',
+      });
+    case 'AssetUnassigned':
+      return t('audit.human.assetReturned', {
+        name: assetName || serial || '-',
+        serial: serial || '-',
+        from: fmtStatus(fromStatus, t) || fromStatus || '-',
+        to: fmtStatus(toStatus, t) || toStatus || '-',
+      });
+    case 'AssetStatusChanged':
+      return t('audit.human.assetStatusChanged', {
+        name: assetName || serial || '-',
+        serial: serial || '-',
+        from: fmtStatus(fromStatus, t) || fromStatus || '-',
+        to: fmtStatus(toStatus, t) || toStatus || '-',
+      });
+    case 'AssetRequestCreated':
+      return t('audit.human.assetRequestCreated', {
+        user: requesterUsername || '-',
+        status: requestStatus ? t(`requestStatus.${requestStatus}`) : '-',
+      });
+    case 'AssetRequestStatusChanged':
+      return t('audit.human.assetRequestStatusChanged', {
+        user: requesterUsername || '-',
+        status: requestStatus ? t(`requestStatus.${requestStatus}`) : '-',
+      });
+    case 'AssetRequestCancelled':
+      return t('audit.human.assetRequestCancelled', {
+        user: requesterUsername || '-',
+        status: requestStatus ? t(`requestStatus.${requestStatus}`) : '-',
+      });
+    case 'InventorySessionCreated':
+    case 'InventoryAssetScanned':
+    case 'InventorySessionClosed':
+      return t('audit.human.inventory', { event: eventType });
+    default:
+      return eventType;
+  }
+}
+
 export function AuditLogs() {
   const { t } = useI18n();
   const [loading, setLoading] = useState(true);
@@ -138,13 +209,14 @@ export function AuditLogs() {
               const requesterUsername = p?.requesterUsername ? String(p.requesterUsername) : '';
 
               const metaParts = [
-                fromStatus && toStatus ? `status: ${fromStatus} → ${toStatus}` : null,
-                ownerType && ownerId ? `owner: ${ownerType} ${ownerId}` : null,
-                requestStatus && requesterUsername ? `request: ${requestStatus} (${requesterUsername})` : null,
-                reason ? `reason: ${reason}` : null,
+                fromStatus && toStatus ? `${t('audit.meta.status')}: ${fmtStatus(fromStatus, t)} → ${fmtStatus(toStatus, t)}` : null,
+                ownerType && ownerId ? `${t('audit.meta.owner')}: ${fmtOwner(ownerType, ownerId, t)}` : null,
+                requestStatus && requesterUsername ? `${t('audit.meta.request')}: ${t(`requestStatus.${requestStatus}`)} (${requesterUsername})` : null,
+                reason ? `${t('audit.meta.reason')}: ${reason}` : null,
               ].filter(Boolean) as string[];
 
               const pretty = env ? JSON.stringify(env, null, 2) : null;
+              const human = humanizeAudit(log.eventType, p, t);
               return (
                 <div key={log.id} className="p-6 hover:bg-gray-50 transition-colors">
                   <div className="flex gap-4">
@@ -157,7 +229,8 @@ export function AuditLogs() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">
-                          <h4 className="font-semibold text-gray-900">{log.eventType}</h4>
+                          <h4 className="font-semibold text-gray-900">{human}</h4>
+                          <div className="text-xs text-gray-500 mt-0.5">{log.eventType}</div>
 
                           {log.entityType === 'ASSET' ? (
                             <Link

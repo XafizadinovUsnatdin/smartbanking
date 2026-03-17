@@ -13,8 +13,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { getDashboardAnalytics } from '../lib/api/analytics';
-import { getActiveOwnerSummary, listAgingAssets, listAssets, listCategories } from '../lib/api/assets';
+import { getActiveOwnerSummary, getAssetSummary, listAgingAssets, listAssets, listCategories } from '../lib/api/assets';
 import { listDepartments, listUsers } from '../lib/api/identity';
 import type { AssetCategory, AssetStatus, Department, User as IdentityUser } from '../types';
 import { useI18n } from '../i18n/I18nProvider';
@@ -86,8 +85,8 @@ export function Dashboard() {
     (async () => {
       setLoading(true);
       try {
-        const [dash, cats, aging, recent] = await Promise.all([
-          getDashboardAnalytics(),
+        const [summary, cats, aging, recent] = await Promise.all([
+          getAssetSummary(),
           listCategories(),
           listAgingAssets({ days: 1095, size: 1 }),
           listAssets({ page: 0, size: 200, sort: 'createdAt,desc' }),
@@ -100,13 +99,13 @@ export function Dashboard() {
           LOST: 0,
           WRITTEN_OFF: 0,
         };
-        dash.byStatus.forEach((s) => {
+        summary.byStatus.forEach((s) => {
           const key = String(s.status) as AssetStatus;
           if (key in statusMap) statusMap[key] = Number(s.count);
         });
 
         const catMap: Record<string, number> = {};
-        dash.byCategory.forEach((c) => {
+        summary.byCategory.forEach((c) => {
           catMap[String(c.categoryCode)] = Number(c.count);
         });
 

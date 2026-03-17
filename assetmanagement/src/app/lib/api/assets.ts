@@ -206,6 +206,25 @@ export async function listCategories(): Promise<AssetCategory[]> {
   return categoriesInflight;
 }
 
+export interface AssetSummaryStatusRow {
+  status: AssetStatus;
+  count: number;
+}
+
+export interface AssetSummaryCategoryRow {
+  categoryCode: string;
+  count: number;
+}
+
+export interface AssetSummary {
+  byStatus: AssetSummaryStatusRow[];
+  byCategory: AssetSummaryCategoryRow[];
+}
+
+export async function getAssetSummary(): Promise<AssetSummary> {
+  return request<AssetSummary>(`${apiBase.asset}/assets/summary`);
+}
+
 export interface CreateCategoryRequest {
   code: string;
   name: string;

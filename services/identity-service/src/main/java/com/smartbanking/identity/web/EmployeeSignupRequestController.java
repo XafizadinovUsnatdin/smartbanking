@@ -152,6 +152,7 @@ public class EmployeeSignupRequestController {
         null,
         null,
         Instant.now(),
+        null,
         r.getPhoneNumber(),
         r.getTelegramUsername(),
         r.getTelegramUserId(),
@@ -226,4 +227,3 @@ public class EmployeeSignupRequestController {
     return out.length() <= length ? out : out.substring(0, length);
   }
 }
-

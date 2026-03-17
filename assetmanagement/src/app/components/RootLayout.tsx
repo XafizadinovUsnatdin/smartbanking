@@ -1,22 +1,58 @@
-import { Outlet, Link, useLocation, Navigate } from 'react-router';
+import { Outlet, Link, useLocation, Navigate, useNavigate } from 'react-router';
 import { LayoutDashboard, Package, History, QrCode, Menu, X, Building2, Tags, ClipboardList, Users, Bell } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useAuth } from './AuthProvider';
 import { Button } from './ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { useI18n } from '../i18n/I18nProvider';
 import { listAssetRequests } from '../lib/api/requests';
-import { listEmployeeSignupRequests } from '../lib/api/identity';
+import { getMe, listEmployeeSignupRequests } from '../lib/api/identity';
+import { formatDateTime } from '../lib/utils';
+import type { AssetRequest, EmployeeSignupRequest } from '../types';
+
+function LangToggle({ lang, setLang }: { lang: 'uz' | 'en'; setLang: (v: 'uz' | 'en') => void }) {
+  return (
+    <div className="hidden sm:flex items-center bg-gray-100 rounded-full p-1 relative">
+      <span
+        className={`absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-full bg-white shadow-sm transition-transform duration-200 ease-out ${
+          lang === 'uz' ? 'translate-x-0' : 'translate-x-full'
+        }`}
+        aria-hidden
+      />
+      <button
+        type="button"
+        onClick={() => setLang('uz')}
+        className={`relative z-10 px-3 py-1 text-xs font-semibold rounded-full transition-colors ${
+          lang === 'uz' ? 'text-gray-900' : 'text-gray-500 hover:text-gray-800'
+        }`}
+      >
+        UZ
+      </button>
+      <button
+        type="button"
+        onClick={() => setLang('en')}
+        className={`relative z-10 px-3 py-1 text-xs font-semibold rounded-full transition-colors ${
+          lang === 'en' ? 'text-gray-900' : 'text-gray-500 hover:text-gray-800'
+        }`}
+      >
+        EN
+      </button>
+    </div>
+  );
+}
 
 export function RootLayout() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { accessToken, user, logout } = useAuth();
   const { lang, setLang, t } = useI18n();
-
-  if (!accessToken) {
-    const next = encodeURIComponent(`${location.pathname}${location.search || ''}`);
-    return <Navigate to={`/login?next=${next}`} replace />;
-  }
+  const [pendingRequests, setPendingRequests] = useState(0);
+  const [pendingAssetReqs, setPendingAssetReqs] = useState<AssetRequest[]>([]);
+  const [pendingSignupReqs, setPendingSignupReqs] = useState<EmployeeSignupRequest[]>([]);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [serverTime, setServerTime] = useState<string | null>(null);
+  const [lastLoginAt, setLastLoginAt] = useState<string | null>(null);
 
   const roles = user?.roles || [];
   const canManage = roles.some((r) => ['ADMIN', 'IT_ADMIN', 'ASSET_MANAGER'].includes(r));
@@ -40,12 +76,12 @@ export function RootLayout() {
     return item?.label || t('app.subtitle');
   };
 
-  const [pendingRequests, setPendingRequests] = useState(0);
-
   useEffect(() => {
     if (!accessToken) return;
     if (!canManage && !isAdmin) {
       setPendingRequests(0);
+      setPendingAssetReqs([]);
+      setPendingSignupReqs([]);
       return;
     }
 
@@ -57,9 +93,15 @@ export function RootLayout() {
           isAdmin ? listEmployeeSignupRequests('PENDING') : Promise.resolve([]),
         ]);
         if (cancelled) return;
-        setPendingRequests((assetReqs?.length || 0) + (signupReqs?.length || 0));
+        setPendingAssetReqs(assetReqs || []);
+        setPendingSignupReqs((signupReqs as EmployeeSignupRequest[]) || []);
+        setPendingRequests((assetReqs?.length || 0) + ((signupReqs as EmployeeSignupRequest[])?.length || 0));
       } catch {
-        if (!cancelled) setPendingRequests(0);
+        if (!cancelled) {
+          setPendingRequests(0);
+          setPendingAssetReqs([]);
+          setPendingSignupReqs([]);
+        }
       }
     };
 
@@ -70,6 +112,63 @@ export function RootLayout() {
       window.clearInterval(id);
     };
   }, [accessToken, canManage, isAdmin]);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const me = await getMe();
+        if (cancelled) return;
+        setServerTime(me.serverTime || null);
+        setLastLoginAt(me.user?.lastLoginAt || null);
+      } catch {
+        if (!cancelled) {
+          setServerTime(null);
+          setLastLoginAt(null);
+        }
+      }
+    };
+    void load();
+    const id = window.setInterval(load, 60_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [accessToken]);
+
+  if (!accessToken) {
+    const next = encodeURIComponent(`${location.pathname}${location.search || ''}`);
+    return <Navigate to={`/login?next=${next}`} replace />;
+  }
+
+  const notificationItems: Array<{
+    key: string;
+    title: string;
+    ts: string;
+    href: string;
+  }> = [
+    ...pendingAssetReqs.map((r) => ({
+      key: `asset:${r.id}`,
+      title: t('notifications.assetRequest', {
+        user: r.requesterUsername || r.requesterId,
+        items: r.items.map((i) => `${i.categoryCode}/${i.type} x${i.quantity}`).join(', '),
+      }),
+      ts: r.createdAt,
+      href: `/requests?tab=ASSETS&requestId=${encodeURIComponent(r.id)}`,
+    })),
+    ...pendingSignupReqs.map((r) => ({
+      key: `signup:${r.id}`,
+      title: t('notifications.employeeSignup', {
+        name: r.fullName,
+        telegram: r.telegramUsername ? `@${String(r.telegramUsername).replace(/^@/, '')}` : `id:${r.telegramUserId}`,
+      }),
+      ts: r.createdAt,
+      href: `/requests?tab=EMPLOYEES&signupRequestId=${encodeURIComponent(r.id)}`,
+    })),
+  ]
+    .sort((a, b) => String(b.ts).localeCompare(String(a.ts)))
+    .slice(0, 8);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -101,38 +200,74 @@ export function RootLayout() {
 
           <div className="flex items-center gap-3">
             {(canManage || isAdmin) && (
-              <Link
-                to="/requests"
-                className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                title={t('nav.requests')}
-              >
-                <Bell className="w-5 h-5 text-gray-700" />
-                {pendingRequests > 0 && (
-                  <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-red-600 text-white text-[11px] leading-5 text-center font-semibold shadow-sm">
-                    {pendingRequests > 99 ? '99+' : pendingRequests}
-                  </span>
-                )}
-              </Link>
+              <Popover open={notifOpen} onOpenChange={setNotifOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                    title={t('nav.requests')}
+                    aria-label={t('nav.requests')}
+                  >
+                    <Bell className="w-5 h-5 text-gray-700" />
+                    {pendingRequests > 0 && (
+                      <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-red-600 text-white text-[11px] leading-5 text-center font-semibold shadow-sm">
+                        {pendingRequests > 99 ? '99+' : pendingRequests}
+                      </span>
+                    )}
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[420px] p-0" align="end" sideOffset={10}>
+                  <div className="p-3 border-b border-gray-100 flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-semibold text-gray-900">{t('notifications.title')}</div>
+                      <div className="text-xs text-gray-500">{t('notifications.subtitle', { count: pendingRequests })}</div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setNotifOpen(false);
+                        navigate('/requests');
+                      }}
+                    >
+                      {t('notifications.viewAll')}
+                    </Button>
+                  </div>
+
+                  {notificationItems.length === 0 ? (
+                    <div className="p-6 text-sm text-gray-500">{t('notifications.empty')}</div>
+                  ) : (
+                    <div className="max-h-80 overflow-auto divide-y divide-gray-100">
+                      {notificationItems.map((n) => (
+                        <button
+                          key={n.key}
+                          type="button"
+                          className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors"
+                          onClick={() => {
+                            setNotifOpen(false);
+                            navigate(n.href);
+                          }}
+                        >
+                          <div className="text-sm text-gray-900 leading-snug">{n.title}</div>
+                          <div className="text-xs text-gray-500 mt-1">{formatDateTime(n.ts)}</div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </PopoverContent>
+              </Popover>
             )}
-            <div className="hidden sm:flex items-center gap-1">
-              <Button
-                variant={lang === 'uz' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setLang('uz')}
-              >
-                UZ
-              </Button>
-              <Button
-                variant={lang === 'en' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setLang('en')}
-              >
-                EN
-              </Button>
-            </div>
+            <LangToggle lang={lang} setLang={setLang} />
             <div className="text-right hidden sm:block">
               <p className="text-sm font-medium text-gray-900">{user?.username || 'User'}</p>
               <p className="text-xs text-gray-400">{(user?.roles || []).join(', ') || 'Authenticated'}</p>
+              {isAdmin && (serverTime || lastLoginAt) && (
+                <p className="text-[11px] text-gray-400 mt-0.5 leading-tight">
+                  {serverTime ? `${t('header.serverTime')}: ${formatDateTime(serverTime)}` : null}
+                  {serverTime && lastLoginAt ? ' • ' : null}
+                  {lastLoginAt ? `${t('header.lastLogin')}: ${formatDateTime(lastLoginAt)}` : null}
+                </p>
+              )}
             </div>
             <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white text-sm font-semibold shadow-sm">
               {(user?.username || 'U').slice(0, 2).toUpperCase()}

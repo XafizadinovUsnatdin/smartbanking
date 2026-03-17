@@ -23,6 +23,34 @@ public interface AssetRepository extends JpaRepository<Asset, UUID>, JpaSpecific
     long getCount();
   }
 
+  interface StatusSummaryRow {
+    AssetStatus getStatus();
+    long getCount();
+  }
+
+  @Query("""
+      select a.status as status, count(a) as count
+      from Asset a
+      where a.deletedAt is null
+      group by a.status
+      order by count(a) desc
+      """)
+  List<StatusSummaryRow> statusSummary();
+
+  interface CategorySummaryRow {
+    String getCategoryCode();
+    long getCount();
+  }
+
+  @Query("""
+      select a.categoryCode as categoryCode, count(a) as count
+      from Asset a
+      where a.deletedAt is null
+      group by a.categoryCode
+      order by count(a) desc
+      """)
+  List<CategorySummaryRow> categorySummary();
+
   @Query("""
       select a.categoryCode as categoryCode, a.type as type, count(a) as count
       from Asset a

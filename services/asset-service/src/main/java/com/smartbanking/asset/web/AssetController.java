@@ -185,6 +185,12 @@ public class AssetController {
         .toList();
   }
 
+  @GetMapping("/summary")
+  @PreAuthorize("hasAnyRole('ADMIN','IT_ADMIN','ASSET_MANAGER','AUDITOR')")
+  public AssetService.AssetSummary summary() {
+    return assetService.summary();
+  }
+
   public record DeleteAssetRequest(String reason) {}
 
   @DeleteMapping("/{id}")
