@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation, Navigate, useNavigate } from 'react-router';
-import { LayoutDashboard, Package, History, QrCode, Menu, X, Building2, Tags, ClipboardList, Users, Bell } from 'lucide-react';
+import { LayoutDashboard, Package, History, Menu, X, Building2, Tags, ClipboardList, Users, Bell } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useAuth } from './AuthProvider';
 import { Button } from './ui/button';
@@ -65,7 +65,6 @@ export function RootLayout() {
     { path: '/requests', icon: ClipboardList, label: t('nav.requests'), color: 'text-violet-500' },
     ...(canManage ? [{ path: '/categories', icon: Tags, label: t('nav.categories'), color: 'text-emerald-500' }] : []),
     { path: '/audit', icon: History, label: t('nav.audit'), color: 'text-teal-500' },
-    { path: '/scanner', icon: QrCode, label: t('nav.scanner'), color: 'text-orange-500' },
   ];
 
   const getPageTitle = () => {

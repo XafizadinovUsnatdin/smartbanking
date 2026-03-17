@@ -77,14 +77,15 @@ public class QrController {
   public record QrLookupResponse(UUID assetId) {}
 
   @GetMapping("/qr/{token}")
-  @PreAuthorize("isAuthenticated()")
   public QrLookupResponse lookup(@PathVariable String token) {
     return new QrLookupResponse(tokenService.resolveAssetId(token));
   }
 
   @GetMapping("/qr/{token}/view")
-  @PreAuthorize("isAuthenticated()")
-  public QrViewService.QrAssetView view(@PathVariable String token, @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
+  public QrViewService.QrAssetView view(
+      @PathVariable String token,
+      @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization
+  ) {
     return viewService.view(token, authorization);
   }
 

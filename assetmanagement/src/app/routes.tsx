@@ -16,6 +16,13 @@ export const router = createBrowserRouter([
     },
   },
   {
+    path: '/scanner',
+    lazy: async () => {
+      const mod = await import('./components/QRScanner');
+      return { Component: mod.QRScanner };
+    },
+  },
+  {
     path: '/',
     lazy: async () => {
       const mod = await import('./components/RootLayout');
@@ -62,13 +69,6 @@ export const router = createBrowserRouter([
         lazy: async () => {
           const mod = await import('./components/AuditLogs');
           return { Component: mod.AuditLogs };
-        },
-      },
-      {
-        path: 'scanner',
-        lazy: async () => {
-          const mod = await import('./components/QRScanner');
-          return { Component: mod.QRScanner };
         },
       },
       {

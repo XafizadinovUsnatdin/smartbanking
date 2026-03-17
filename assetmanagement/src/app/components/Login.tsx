@@ -66,7 +66,7 @@ export function Login() {
               </p>
             </div>
 
-            <form onSubmit={onSubmit} className="mt-8 space-y-5" autoComplete="off">
+            <form onSubmit={onSubmit} className="mt-8 space-y-5 max-w-sm sm:max-w-md" autoComplete="off">
               <div>
                 <Label htmlFor="username">{t('login.username')}</Label>
                 <div className="relative mt-2">
@@ -75,7 +75,6 @@ export function Login() {
                     id="username"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    placeholder="admin"
                     autoComplete="off"
                     className="pl-10 h-12"
                   />
@@ -109,10 +108,6 @@ export function Login() {
                 <LogIn className="w-5 h-5 mr-2" />
                 {loading ? t('login.wait') : t('login.submit')}
               </Button>
-
-              <p className="text-xs text-gray-400">
-                {t('login.tip')}
-              </p>
             </form>
           </div>
 
