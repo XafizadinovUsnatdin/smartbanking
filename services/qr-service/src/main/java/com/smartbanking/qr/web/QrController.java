@@ -95,7 +95,7 @@ public class QrController {
     }
     String base = payloadBaseUrl.endsWith("/") ? payloadBaseUrl.substring(0, payloadBaseUrl.length() - 1) : payloadBaseUrl;
     String encoded = URLEncoder.encode(token, StandardCharsets.UTF_8);
-    return base + "/scanner?token=" + encoded;
+    return base + "/qr/" + encoded;
   }
 
   private byte[] renderLabelPng(String qrPayload, String token, String authorizationHeader) {

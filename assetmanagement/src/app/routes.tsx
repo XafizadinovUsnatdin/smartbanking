@@ -16,6 +16,13 @@ export const router = createBrowserRouter([
     },
   },
   {
+    path: '/qr/:token',
+    lazy: async () => {
+      const mod = await import('./components/QrPublicView');
+      return { Component: mod.QrPublicView };
+    },
+  },
+  {
     path: '/scanner',
     lazy: async () => {
       const mod = await import('./components/QRScanner');
