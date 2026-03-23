@@ -20,6 +20,7 @@ services:
       BOOTSTRAP_ADMIN_USERNAME: ${BOOTSTRAP_ADMIN_USERNAME:-admin}
       BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-Admin1234!}
       BOOTSTRAP_ADMIN_FULL_NAME: ${BOOTSTRAP_ADMIN_FULL_NAME:-System Admin}
+      BOOTSTRAP_ADMIN_RESET: ${BOOTSTRAP_ADMIN_RESET:-false}
 
   asset-service:
     ports: []
@@ -75,4 +76,3 @@ services:
       - ./infra/caddy/Caddyfile.gateway:/etc/caddy/Caddyfile:ro
       - ./.data/caddy/data:/data
       - ./.data/caddy/config:/config
-

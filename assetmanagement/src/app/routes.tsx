@@ -23,13 +23,6 @@ export const router = createBrowserRouter([
     },
   },
   {
-    path: '/scanner',
-    lazy: async () => {
-      const mod = await import('./components/QRScanner');
-      return { Component: mod.QRScanner };
-    },
-  },
-  {
     path: '/',
     lazy: async () => {
       const mod = await import('./components/RootLayout');

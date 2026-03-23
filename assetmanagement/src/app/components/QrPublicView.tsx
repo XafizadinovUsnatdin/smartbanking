@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router';
-import { Building, Package, User } from 'lucide-react';
+import { Building, User } from 'lucide-react';
 import { toast } from 'sonner';
-import { downloadQrPhoto, viewQr } from '../lib/api/qr';
+import { qrPhotoUrl, viewQr } from '../lib/api/qr';
 import { listCategories } from '../lib/api/assets';
 import type { QrAssetView } from '../lib/api/qr';
 import type { AssetCategory } from '../types';
@@ -18,7 +18,6 @@ export function QrPublicView() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<QrAssetView | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [categories, setCategories] = useState<AssetCategory[]>([]);
   const [photoPreviewOpen, setPhotoPreviewOpen] = useState(false);
   const [photoPreviewId, setPhotoPreviewId] = useState<string | null>(null);
@@ -34,7 +33,7 @@ export function QrPublicView() {
     return result?.photos?.find((p) => p.id === photoPreviewId) || null;
   }, [photoPreviewId, result?.photos]);
 
-  const previewUrl = previewPhoto ? photoUrls[previewPhoto.id] : null;
+  const previewUrl = previewPhoto ? qrPhotoUrl(previewPhoto.id) : null;
 
   useEffect(() => {
     (async () => {
@@ -46,36 +45,6 @@ export function QrPublicView() {
       }
     })();
   }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      if (!result?.photos?.length) {
-        Object.values(photoUrls).forEach((u) => URL.revokeObjectURL(u));
-        setPhotoUrls({});
-        return;
-      }
-      const urls: Record<string, string> = {};
-      try {
-        for (const p of result.photos) {
-          const blob = await downloadQrPhoto(p.id);
-          urls[p.id] = URL.createObjectURL(blob);
-        }
-      } catch {
-        // ignore
-      }
-      if (cancelled) {
-        Object.values(urls).forEach((u) => URL.revokeObjectURL(u));
-        return;
-      }
-      Object.values(photoUrls).forEach((u) => URL.revokeObjectURL(u));
-      setPhotoUrls(urls);
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [result?.photos]);
 
   useEffect(() => {
     if (!token) {
@@ -179,21 +148,22 @@ export function QrPublicView() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {result.photos.map((p) => (
                     <div key={p.id} className="border border-gray-200 rounded-lg overflow-hidden">
-                      {photoUrls[p.id] ? (
-                        <button
-                          type="button"
-                          className="block w-full"
-                          onClick={() => {
-                            setPhotoPreviewId(p.id);
-                            setPhotoPreviewOpen(true);
-                          }}
-                          title={t('asset.photos.preview')}
-                        >
-                          <img src={photoUrls[p.id]} alt={p.filename} className="w-full h-32 object-cover" />
-                        </button>
-                      ) : (
-                        <div className="w-full h-32 bg-gray-50 flex items-center justify-center text-xs text-gray-400">...</div>
-                      )}
+                      <button
+                        type="button"
+                        className="block w-full"
+                        onClick={() => {
+                          setPhotoPreviewId(p.id);
+                          setPhotoPreviewOpen(true);
+                        }}
+                        title={t('asset.photos.preview')}
+                      >
+                        <img
+                          src={qrPhotoUrl(p.id)}
+                          alt={p.filename}
+                          className="w-full h-32 object-cover"
+                          loading="lazy"
+                        />
+                      </button>
                       <div className="p-2">
                         <p className="text-xs text-gray-600 truncate" title={p.filename}>
                           {p.filename}

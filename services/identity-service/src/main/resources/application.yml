@@ -42,3 +42,6 @@ bootstrap:
     username: ${BOOTSTRAP_ADMIN_USERNAME:}
     password: ${BOOTSTRAP_ADMIN_PASSWORD:}
     full-name: ${BOOTSTRAP_ADMIN_FULL_NAME:Admin}
+    # Set true ONLY to recover access when you forgot the bootstrap admin password.
+    # When enabled and the user already exists, password will be reset to BOOTSTRAP_ADMIN_PASSWORD.
+    reset: ${BOOTSTRAP_ADMIN_RESET:false}

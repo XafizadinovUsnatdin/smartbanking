@@ -32,10 +32,30 @@ services:
     volumes:
       - ./.data/redis:/data
 
+  # Fix bind-mount permissions on Linux hosts where Confluent images run as uid=1000 (appuser).
+  # This init container is safe on Windows/macOS too (chown may be a no-op).
+  zookeeper-init:
+    image: alpine:3.20
+    logging: *default-logging
+    user: "0:0"
+    restart: "no"
+    command:
+      - sh
+      - -c
+      - >-
+        mkdir -p /var/lib/zookeeper/data /var/lib/zookeeper/log
+        && (chown -R 1000:1000 /var/lib/zookeeper || true)
+    volumes:
+      - ./.data/zookeeper/data:/var/lib/zookeeper/data
+      - ./.data/zookeeper/log:/var/lib/zookeeper/log
+
   zookeeper:
     image: confluentinc/cp-zookeeper:7.6.1
     logging: *default-logging
     restart: unless-stopped
+    depends_on:
+      zookeeper-init:
+        condition: service_completed_successfully
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
@@ -50,11 +70,27 @@ services:
       timeout: 3s
       retries: 40
 
+  kafka-init:
+    image: alpine:3.20
+    logging: *default-logging
+    user: "0:0"
+    restart: "no"
+    command:
+      - sh
+      - -c
+      - >-
+        mkdir -p /var/lib/kafka/data
+        && (chown -R 1000:1000 /var/lib/kafka || true)
+    volumes:
+      - ./.data/kafka:/var/lib/kafka/data
+
   kafka:
     image: confluentinc/cp-kafka:7.6.1
     logging: *default-logging
     restart: unless-stopped
     depends_on:
+      kafka-init:
+        condition: service_completed_successfully
       zookeeper:
         condition: service_healthy
     ports:
@@ -87,6 +123,7 @@ services:
       BOOTSTRAP_ADMIN_USERNAME: ${BOOTSTRAP_ADMIN_USERNAME:-admin}
       BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-Admin1234!}
       BOOTSTRAP_ADMIN_FULL_NAME: ${BOOTSTRAP_ADMIN_FULL_NAME:-System Admin}
+      BOOTSTRAP_ADMIN_RESET: ${BOOTSTRAP_ADMIN_RESET:-false}
     restart: unless-stopped
     ports:
       - "8081:8081"

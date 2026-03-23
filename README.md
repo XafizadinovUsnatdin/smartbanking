@@ -13,8 +13,15 @@ Microservice-based platform (Java 17 + Spring Boot + PostgreSQL + Kafka + Redis)
    - `docker compose up --build -d`
    - If `docker` is not recognized in PowerShell:
      - `& 'C:\Program Files\Docker\Docker\resources\bin\docker.exe' compose up --build -d`
-2. Create first admin (only once, when DB is empty):
-   - `curl -X POST http://localhost:8081/auth/register -H "Content-Type: application/json" -d "{\"username\":\"admin\",\"password\":\"Admin1234!\",\"fullName\":\"System Admin\"}"`
+2. Login (first admin is auto-created on first start):
+   - Default: `admin` / `Admin1234!`
+   - Configure via `.env`: `BOOTSTRAP_ADMIN_USERNAME`, `BOOTSTRAP_ADMIN_PASSWORD`, `BOOTSTRAP_ADMIN_FULL_NAME`
+
+### Forgot admin password (no DB reset)
+If DB already has users and you forgot the admin password:
+1. Set `.env`: `BOOTSTRAP_ADMIN_RESET=true` + new `BOOTSTRAP_ADMIN_PASSWORD`
+2. Restart identity-service: `docker compose restart identity-service`
+3. Login, then set `BOOTSTRAP_ADMIN_RESET=false` again.
 
 ## API docs (Swagger / OpenAPI)
 
@@ -87,6 +94,7 @@ If your frontend is deployed (e.g. Vercel) and you want to make your **local** b
 
 1. Start backend + tunnel:
    - `docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up -d --build`
+   - Or: `bash scripts/compose-tunnel.sh quick up -d --build`
 2. Read the public URL:
    - `docker compose -f docker-compose.yml -f docker-compose.tunnel.yml logs -f cloudflared`
    - Look for a `https://<something>.trycloudflare.com` URL
@@ -113,3 +121,4 @@ If you bought a domain (e.g. `tahlilchi.uz`) and want a **stable** backend URL l
    - `CLOUDFLARED_TOKEN=...`
 4. Start backend + tunnel:
    - `docker compose -f docker-compose.yml -f docker-compose.tunnel.yml -f docker-compose.cloudflare.yml up -d --build`
+   - Or: `bash scripts/compose-tunnel.sh named up -d --build`

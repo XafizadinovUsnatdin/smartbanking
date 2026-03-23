@@ -61,7 +61,7 @@ Variant 1 (subdomain-based): `docker-compose.vps.yml`
 Variant 2 (gateway, Vercel uchun qulay): `docker-compose.vps.gateway.yml`
 - faqat **80/443** portlar ochiq
 - Bitta API domen: `https://smartbanking-api.<domain>`
-- Frontend Vercel/Cloudflare Pages’da bo‘lsa ham, `VITE_*` env’lar oson bo‘ladi:
+- Frontend Vercel/Cloudflare Pages'da bo'lsa ham, `VITE_*` env'lar oson bo'ladi:
   - `VITE_IDENTITY_API=https://smartbanking-api.<domain>/identity`
   - `VITE_ASSET_API=https://smartbanking-api.<domain>/asset`
   - `VITE_AUDIT_API=https://smartbanking-api.<domain>`
@@ -84,7 +84,7 @@ QR_SECRET=change-this-to-a-strong-random-32+chars
 # Frontend origin (CORS)
 CORS_ALLOWED_ORIGINS=https://app.example.com,https://smartbanking.example.com
 
-# QR payload opens the scanner page with token
+# QR payload opens the public QR view with token
 QR_PAYLOAD_BASE_URL=https://smartbanking.example.com
 
 # Optional
@@ -110,6 +110,57 @@ Bu variantda Caddy allaqachon bor va 80/443 ishlatadi.
 Cloudflare DNS:
 - `A` record: `app`, `identity`, `asset`, `audit`, `qr`, `analytics` -> VPS IP
 - Proxy (orange cloud) ON bo'lsa ham bo'ladi.
+
+#### 6) Lokal Docker DB'ni VPS'ga ko'chirish (ixtiyoriy)
+Eslatma: VPS'dagi Postgres **yangi** bo'ladi. Laptop'dagi DB avtomatik ko'chmaydi.
+
+**A) Laptop (Windows) - dump olish**
+1) `D:\SmartBanking` ichida:
+```powershell
+cd D:\SmartBanking
+docker compose up -d postgres
+New-Item -ItemType Directory -Force backups | Out-Null
+
+docker compose exec -T postgres pg_dump -U smartbanking -d identity_db   -Fc -f /tmp/identity_db.dump
+docker compose exec -T postgres pg_dump -U smartbanking -d asset_db      -Fc -f /tmp/asset_db.dump
+docker compose exec -T postgres pg_dump -U smartbanking -d audit_db      -Fc -f /tmp/audit_db.dump
+docker compose exec -T postgres pg_dump -U smartbanking -d analytics_db  -Fc -f /tmp/analytics_db.dump
+
+docker compose cp postgres:/tmp/identity_db.dump  backups/identity_db.dump
+docker compose cp postgres:/tmp/asset_db.dump     backups/asset_db.dump
+docker compose cp postgres:/tmp/audit_db.dump     backups/audit_db.dump
+docker compose cp postgres:/tmp/analytics_db.dump backups/analytics_db.dump
+```
+
+2) Agar asset rasmlari bor bo'lsa (muhim):
+   - Laptop: `D:\SmartBanking\.data\asset-photos\`
+   - VPS: `/opt/smartbanking/.data/asset-photos/` ga ko'chiring.
+
+**B) Laptop -> VPS (upload)**
+```powershell
+scp .\backups\*.dump root@<VPS_IP>:/opt/smartbanking/backups/
+scp -r .\.data\asset-photos root@<VPS_IP>:/opt/smartbanking/.data/
+```
+
+**C) VPS - restore**
+```bash
+cd /opt/smartbanking
+mkdir -p backups
+
+# App servislarni to'xtatib turamiz (Postgres ishlasin)
+docker compose -f docker-compose.yml -f docker-compose.tunnel.yml -f docker-compose.cloudflare.yml stop \
+  identity-service asset-service audit-service qr-service inventory-analytics-service telegram-service \
+  kafka zookeeper redis api-gateway cloudflared
+
+# Restore (DB ichidagi obyektlarni tozalab, laptop'dagi holatni tiklaydi)
+cat backups/identity_db.dump  | docker compose -f docker-compose.yml -f docker-compose.tunnel.yml -f docker-compose.cloudflare.yml exec -T postgres pg_restore -U smartbanking -d identity_db  --clean --if-exists --no-owner --no-privileges
+cat backups/asset_db.dump     | docker compose -f docker-compose.yml -f docker-compose.tunnel.yml -f docker-compose.cloudflare.yml exec -T postgres pg_restore -U smartbanking -d asset_db     --clean --if-exists --no-owner --no-privileges
+cat backups/audit_db.dump     | docker compose -f docker-compose.yml -f docker-compose.tunnel.yml -f docker-compose.cloudflare.yml exec -T postgres pg_restore -U smartbanking -d audit_db     --clean --if-exists --no-owner --no-privileges
+cat backups/analytics_db.dump | docker compose -f docker-compose.yml -f docker-compose.tunnel.yml -f docker-compose.cloudflare.yml exec -T postgres pg_restore -U smartbanking -d analytics_db --clean --if-exists --no-owner --no-privileges
+
+# Hammasini qayta ko'taramiz
+docker compose -f docker-compose.yml -f docker-compose.tunnel.yml -f docker-compose.cloudflare.yml up -d --build
+```
 
 ---
 
@@ -141,3 +192,4 @@ nano .env
 docker compose -f docker-compose.yml -f docker-compose.vps.yml up -d --build
 ```
 5. This setup already includes **Caddy** (HTTPS on 80/443). Point your DNS (`app`, `identity`, `asset`, `audit`, `qr`, `analytics`) to the VPS IP.
+

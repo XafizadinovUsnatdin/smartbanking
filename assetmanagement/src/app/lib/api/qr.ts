@@ -1,15 +1,22 @@
 import { apiBase, request, requestBlob } from './client';
 import type { Asset, AssetPhoto, OwnerType } from './types';
 
+function qrRoot(): string {
+  const base = apiBase.qr.replace(/\/+$/, '');
+  return base.endsWith('/qr') ? base : `${base}/qr`;
+}
+
+export function qrPhotoUrl(photoId: string): string {
+  return `${qrRoot()}/photos/${encodeURIComponent(photoId)}`;
+}
+
 export interface QrGenerateResponse {
   token: string;
   pngBase64: string;
 }
 
 export async function generateAssetQr(assetId: string): Promise<QrGenerateResponse> {
-  const base = apiBase.qr.replace(/\/+$/, '');
-  const root = base.endsWith('/qr') ? base : `${base}/qr`;
-  return request<QrGenerateResponse>(`${root}/assets/${assetId}`, { method: 'POST' });
+  return request<QrGenerateResponse>(`${qrRoot()}/assets/${assetId}`, { method: 'POST' });
 }
 
 export interface QrLookupResponse {
@@ -17,9 +24,7 @@ export interface QrLookupResponse {
 }
 
 export async function lookupQr(token: string): Promise<QrLookupResponse> {
-  const base = apiBase.qr.replace(/\/+$/, '');
-  const root = base.endsWith('/qr') ? base : `${base}/qr`;
-  return request<QrLookupResponse>(`${root}/${encodeURIComponent(token)}`);
+  return request<QrLookupResponse>(`${qrRoot()}/${encodeURIComponent(token)}`);
 }
 
 export interface QrOwnerView {
@@ -35,9 +40,7 @@ export interface QrAssetView {
 }
 
 export async function viewQr(token: string): Promise<QrAssetView> {
-  const base = apiBase.qr.replace(/\/+$/, '');
-  const root = base.endsWith('/qr') ? base : `${base}/qr`;
-  return request<QrAssetView>(`${root}/${encodeURIComponent(token)}/view`);
+  return request<QrAssetView>(`${qrRoot()}/${encodeURIComponent(token)}/view`);
 }
 
 export interface BulkAssetQrTokenResponse {
@@ -47,16 +50,12 @@ export interface BulkAssetQrTokenResponse {
 }
 
 export async function bulkAssetQrTokens(assetIds: string[]): Promise<BulkAssetQrTokenResponse[]> {
-  const base = apiBase.qr.replace(/\/+$/, '');
-  const root = base.endsWith('/qr') ? base : `${base}/qr`;
-  return request<BulkAssetQrTokenResponse[]>(`${root}/assets/tokens`, {
+  return request<BulkAssetQrTokenResponse[]>(`${qrRoot()}/assets/tokens`, {
     method: 'POST',
     body: JSON.stringify({ assetIds }),
   });
 }
 
 export async function downloadQrPhoto(photoId: string): Promise<Blob> {
-  const base = apiBase.qr.replace(/\/+$/, '');
-  const root = base.endsWith('/qr') ? base : `${base}/qr`;
-  return requestBlob(`${root}/photos/${encodeURIComponent(photoId)}`, {}, false);
+  return requestBlob(qrPhotoUrl(photoId), {}, false);
 }
