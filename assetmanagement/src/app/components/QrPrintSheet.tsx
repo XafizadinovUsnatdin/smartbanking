@@ -4,8 +4,8 @@ import { ArrowLeft, Printer, QrCode } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { toast } from 'sonner';
 import { bulkAssetQrTokens } from '../lib/api/qr';
-import { listAgingAssets, listAssets } from '../lib/api/assets';
-import type { Asset, AssetStatus } from '../types';
+import { listAgingAssets, listAssets, listCategories } from '../lib/api/assets';
+import type { Asset, AssetCategory, AssetStatus } from '../types';
 import { useI18n } from '../i18n/I18nProvider';
 import { useAuth } from './AuthProvider';
 import { Button } from './ui/button';
@@ -20,9 +20,28 @@ export function QrPrintSheet() {
 
   const [loading, setLoading] = useState(false);
   const [assets, setAssets] = useState<Asset[]>([]);
+  const [categories, setCategories] = useState<AssetCategory[]>([]);
   const [totalItems, setTotalItems] = useState(0);
   const [truncated, setTruncated] = useState(false);
   const [qrPayloadByAssetId, setQrPayloadByAssetId] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!accessToken) return;
+    (async () => {
+      try {
+        const cats = await listCategories();
+        setCategories(cats || []);
+      } catch {
+        setCategories([]);
+      }
+    })();
+  }, [accessToken]);
+
+  const categoryName = (code: string) => {
+    if (!code) return '-';
+    const found = categories.find((c) => c.code === code);
+    return found?.name || code;
+  };
 
   useEffect(() => {
     if (!accessToken) return;
@@ -134,8 +153,18 @@ export function QrPrintSheet() {
             {assets.map((asset) => {
               const qrPayload = qrPayloadByAssetId[asset.id];
               return (
-                <div key={asset.id} className="break-inside-avoid bg-white border border-gray-300 rounded-lg p-3">
-                  <div className="aspect-square w-full border border-gray-200 rounded-md flex items-center justify-center bg-white p-2">
+                <div
+                  key={asset.id}
+                  className="break-inside-avoid bg-white border border-dashed border-gray-400 rounded-md p-2.5"
+                  title={`${asset.name} (${asset.serialNumber})`}
+                >
+                  <div className="text-center mb-2">
+                    <div className="text-[11px] font-semibold text-gray-900 truncate">{asset.name}</div>
+                    <div className="text-[10px] text-gray-600 truncate">{categoryName(asset.categoryCode)}</div>
+                    <div className="text-[10px] font-mono text-gray-800 truncate">{asset.serialNumber}</div>
+                  </div>
+
+                  <div className="aspect-square w-full border border-gray-200 rounded-sm flex items-center justify-center bg-white p-2">
                     {qrPayload ? (
                       <QRCode value={qrPayload} style={{ width: '100%', height: '100%' }} />
                     ) : (

@@ -127,6 +127,14 @@ export function Login() {
             </div>
 
             <div className="relative">
+              <div className="flex justify-center mb-8">
+                <img
+                  src="/brand/markaziy-bank.svg"
+                  alt="O'zbekiston Respublikasi Markaziy banki"
+                  className="w-[22rem] max-w-full h-auto bg-white/90 rounded-xl p-3 shadow-sm border border-white/20"
+                />
+              </div>
+
               <div className="inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/15 px-4 py-2 text-sm">
                 <ShieldCheck className="w-4 h-4 text-white/90" />
                 <span>{t('login.hero.badge')}</span>
