@@ -95,3 +95,26 @@ ni moslab qo'ying.
 
 ### EN
 Set `CORS_ALLOWED_ORIGINS=https://your-frontend-domain` on all backend services.
+
+---
+
+## 5) Stable domain for local backend (Cloudflare Tunnel)
+
+### UZ (tavsiya)
+Quick tunnel (`trycloudflare.com`) URL o'zgarib turadi. Domeningiz bo'lsa (`api.tahlilchi.uz` kabi), **stable** tunnel qiling:
+
+1. Cloudflare -> **Zero Trust** -> Networks -> Tunnels -> Create tunnel -> token oling.
+2. Tunnel ichida **Public Hostname** qo'shing:
+   - Hostname: `api.<domeningiz>`
+   - Service: `http://localhost:18080` (bu repo'dagi `api-gateway`)
+3. Lokal `.env` ga qo'ying:
+   - `CLOUDFLARED_TOKEN=...`
+4. Ishga tushirish:
+   - `docker compose -f docker-compose.yml -f docker-compose.tunnel.yml -f docker-compose.cloudflare.yml up -d --build`
+
+### EN
+Use a named Cloudflare Tunnel (stable hostname) instead of quick tunnels:
+1. Create tunnel in Zero Trust and copy token.
+2. Add Public Hostname `api.<your-domain>` -> `http://localhost:18080` (repo gateway).
+3. Set `CLOUDFLARED_TOKEN` in local `.env`.
+4. Run: `docker compose -f docker-compose.yml -f docker-compose.tunnel.yml -f docker-compose.cloudflare.yml up -d --build`

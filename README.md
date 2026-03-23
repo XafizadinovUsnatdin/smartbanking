@@ -100,3 +100,16 @@ If your frontend is deployed (e.g. Vercel) and you want to make your **local** b
    - `CORS_ALLOWED_ORIGINS=https://assettracing.vercel.app,http://localhost:5173`
 
 Note: the quick tunnel URL can change if you stop/restart `cloudflared`. For a stable URL, use a real domain with Cloudflare Tunnel.
+
+## Stable domain (Cloudflare Tunnel + your domain)
+
+If you bought a domain (e.g. `tahlilchi.uz`) and want a **stable** backend URL like `https://api.tahlilchi.uz`, use a named tunnel token:
+
+1. Cloudflare -> Zero Trust -> Networks -> Tunnels -> Create tunnel (Cloudflared) -> copy the **token**.
+2. Add a Public Hostname in the same tunnel:
+   - Hostname: `api.<your-domain>`
+   - Service: `http://localhost:18080` (this repo's `api-gateway`)
+3. Put the token into your local `.env` (do **not** commit it):
+   - `CLOUDFLARED_TOKEN=...`
+4. Start backend + tunnel:
+   - `docker compose -f docker-compose.yml -f docker-compose.tunnel.yml -f docker-compose.cloudflare.yml up -d --build`
