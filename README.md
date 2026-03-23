@@ -14,7 +14,7 @@ Microservice-based platform (Java 17 + Spring Boot + PostgreSQL + Kafka + Redis)
    - If `docker` is not recognized in PowerShell:
      - `& 'C:\Program Files\Docker\Docker\resources\bin\docker.exe' compose up --build -d`
 2. Login (first admin is auto-created on first start):
-   - Default: `admin` / `Admin1234!`
+   - 
    - Configure via `.env`: `BOOTSTRAP_ADMIN_USERNAME`, `BOOTSTRAP_ADMIN_PASSWORD`, `BOOTSTRAP_ADMIN_FULL_NAME`
 
 ### Forgot admin password (no DB reset)
