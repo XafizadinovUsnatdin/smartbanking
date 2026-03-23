@@ -6,6 +6,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -26,7 +27,7 @@ public class AuditController {
       @RequestParam(required = false) String eventType,
       @RequestParam(required = false) Instant from,
       @RequestParam(required = false) Instant to,
-      @PageableDefault(size = 50) Pageable pageable
+      @PageableDefault(size = 50, sort = "occurredAt", direction = Sort.Direction.DESC) Pageable pageable
   ) {
     Instant fromTs = from == null ? Instant.now().minus(30, ChronoUnit.DAYS) : from;
     Instant toTs = to == null ? Instant.now() : to;

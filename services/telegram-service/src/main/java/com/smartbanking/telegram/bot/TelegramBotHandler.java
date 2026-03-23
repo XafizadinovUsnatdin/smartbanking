@@ -514,10 +514,11 @@ public class TelegramBotHandler {
   private void sendAssetCard(long chatId, int index, Asset asset) {
     if (asset == null) return;
 
-    String title = index + ") " + safe(asset.name());
-    String text = title + "\n"
-        + "Serial: " + safe(asset.serialNumber()) + "\n"
-        + "Status: " + safe(asset.status());
+    String text = "📦 " + index + ". " + safe(asset.name()) + "\n"
+        + "🔖 Serial: " + safe(asset.serialNumber()) + "\n"
+        + "🏷️ Turi: " + safe(asset.type()) + "\n"
+        + "🗂️ Kategoriya: " + safe(asset.categoryCode()) + "\n"
+        + "📌 Status: " + statusLabel(asset.status());
 
     String status = asset.status() == null ? "" : asset.status().trim().toUpperCase();
     boolean terminal = "LOST".equals(status) || "WRITTEN_OFF".equals(status);
@@ -526,12 +527,12 @@ public class TelegramBotHandler {
     if (!terminal) {
       kb = new InlineKeyboardMarkup(List.of(
           List.of(
-              new InlineKeyboardButton("Ishlayapti", "chk:ok:" + asset.id()),
-              new InlineKeyboardButton("Buzilgan", "iss:broken:" + asset.id())
+              new InlineKeyboardButton("✅ Ishlayapti", "chk:ok:" + asset.id()),
+              new InlineKeyboardButton("⚠️ Buzilgan", "iss:broken:" + asset.id())
           ),
           List.of(
-              new InlineKeyboardButton("Tamirtalab", "iss:repair:" + asset.id()),
-              new InlineKeyboardButton("Yo'qolgan", "iss:lost:" + asset.id())
+              new InlineKeyboardButton("🛠 Tamirtalab", "iss:repair:" + asset.id()),
+              new InlineKeyboardButton("❌ Yo'qolgan", "iss:lost:" + asset.id())
           )
       ));
     }
@@ -551,6 +552,19 @@ public class TelegramBotHandler {
     }
 
     telegram.sendMessage(chatId, text, kb);
+  }
+
+  private static String statusLabel(String raw) {
+    if (raw == null || raw.isBlank()) return "-";
+    String s = raw.trim().toUpperCase();
+    return switch (s) {
+      case "REGISTERED" -> "Ro'yxatga olingan";
+      case "ASSIGNED" -> "Biriktirilgan";
+      case "IN_REPAIR" -> "Ta'mirda";
+      case "LOST" -> "Yo'qolgan";
+      case "WRITTEN_OFF" -> "Hisobdan chiqarilgan";
+      default -> raw.trim();
+    };
   }
 
   private void onRequest(TelegramModels.Message msg) {

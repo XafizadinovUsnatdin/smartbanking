@@ -16,14 +16,16 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
-type OwnerTab = OwnerType;
-
 interface OwnerRow {
   ownerType: OwnerType;
   ownerId: string;
   title: string;
   subtitle?: string | null;
   count: number;
+}
+
+interface OwnerTreeRow extends OwnerRow {
+  level: 0 | 1 | 2;
 }
 
 function getKey(ownerType: OwnerType, ownerId: string) {
@@ -38,7 +40,6 @@ export function Users() {
   const canManage = roles.some((r) => ['ADMIN', 'IT_ADMIN', 'ASSET_MANAGER', 'AUDITOR'].includes(r));
   const canEdit = roles.some((r) => ['ADMIN', 'IT_ADMIN', 'ASSET_MANAGER'].includes(r));
 
-  const [tab, setTab] = useState<OwnerTab>('EMPLOYEE');
   const [query, setQuery] = useState('');
 
   const [loading, setLoading] = useState(true);
@@ -106,63 +107,167 @@ export function Users() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canManage]);
 
-  const rows: OwnerRow[] = useMemo(() => {
+  const treeRows: OwnerTreeRow[] = useMemo(() => {
     if (!canManage) return [];
-    if (tab === 'EMPLOYEE') {
-      return users.map((u) => {
-        const deptName = u.departmentId ? deptById[u.departmentId]?.name : null;
-        const branchName = u.branchId ? branchById[u.branchId]?.name : u.departmentId ? branchById[deptById[u.departmentId]?.branchId || '']?.name : null;
-        const tg = u.telegramUsername
-          ? `@${String(u.telegramUsername).replace(/^@/, '')}`
-          : u.telegramUserId
-            ? `id:${u.telegramUserId}`
-            : null;
-        const subtitle = [u.jobTitle, u.phoneNumber, tg, deptName, branchName].filter(Boolean).join(' - ');
-        return {
-          ownerType: 'EMPLOYEE',
-          ownerId: u.id,
-          title: u.fullName || u.username || u.id,
-          subtitle: subtitle || null,
-          count: activeCounts[getKey('EMPLOYEE', u.id)] || 0,
-        };
-      });
-    }
-    if (tab === 'DEPARTMENT') {
-      return departments.map((d) => {
-        const branchName = d.branchId ? branchById[d.branchId]?.name : null;
-        const tg = d.telegramUsername
-          ? `@${String(d.telegramUsername).replace(/^@/, '')}`
-          : d.telegramChatId
-            ? `id:${d.telegramChatId}`
-            : null;
-        return {
-          ownerType: 'DEPARTMENT',
-          ownerId: d.id,
-          title: d.name,
-          subtitle: [d.phoneNumber, tg, branchName].filter(Boolean).join(' - ') || null,
-          count: activeCounts[getKey('DEPARTMENT', d.id)] || 0,
-        };
-      });
-    }
-    return branches.map((b) => ({
+
+    const q = query.trim().toLowerCase();
+
+    const matches = (r: OwnerRow) => {
+      if (!q) return true;
+      const hay = `${r.title} ${r.subtitle || ''}`.toLowerCase();
+      return hay.includes(q);
+    };
+
+    const userRow = (u: User): OwnerRow => {
+      const tg = u.telegramUsername
+        ? `@${String(u.telegramUsername).replace(/^@/, '')}`
+        : u.telegramUserId
+          ? `id:${u.telegramUserId}`
+          : null;
+      const subtitle = [u.username, u.jobTitle, u.phoneNumber, tg].filter(Boolean).join(' - ');
+      return {
+        ownerType: 'EMPLOYEE',
+        ownerId: u.id,
+        title: u.fullName || u.username || u.id,
+        subtitle: subtitle || null,
+        count: activeCounts[getKey('EMPLOYEE', u.id)] || 0,
+      };
+    };
+
+    const deptRow = (d: Department): OwnerRow => {
+      const tg = d.telegramUsername
+        ? `@${String(d.telegramUsername).replace(/^@/, '')}`
+        : d.telegramChatId
+          ? `id:${d.telegramChatId}`
+          : null;
+      return {
+        ownerType: 'DEPARTMENT',
+        ownerId: d.id,
+        title: d.name,
+        subtitle: [d.phoneNumber, tg].filter(Boolean).join(' - ') || null,
+        count: activeCounts[getKey('DEPARTMENT', d.id)] || 0,
+      };
+    };
+
+    const branchRow = (b: Branch): OwnerRow => ({
       ownerType: 'BRANCH',
       ownerId: b.id,
       title: b.name,
       subtitle: b.address || null,
       count: activeCounts[getKey('BRANCH', b.id)] || 0,
-    }));
-  }, [canManage, tab, users, departments, branches, activeCounts, deptById, branchById]);
+    });
 
-  const filteredRows = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return rows.sort((a, b) => b.count - a.count);
-    return rows
-      .filter((r) => {
-        const hay = `${r.title} ${r.subtitle || ''}`.toLowerCase();
-        return hay.includes(q);
-      })
-      .sort((a, b) => b.count - a.count);
-  }, [rows, query]);
+    const byName = (a?: string | null, b?: string | null) =>
+      String(a || '').localeCompare(String(b || ''), undefined, { sensitivity: 'base' });
+
+    // Departments grouped by branch (unknown/missing branch -> orphan)
+    const deptsByBranchId: Record<string, Department[]> = {};
+    const orphanDepts: Department[] = [];
+    for (const d of departments) {
+      const bid = d.branchId || '';
+      if (bid && branchById[bid]) {
+        (deptsByBranchId[bid] ||= []).push(d);
+      } else {
+        orphanDepts.push(d);
+      }
+    }
+
+    // Users grouped by department (unknown/missing department -> noDept), then by branch for noDept users
+    const usersByDeptId: Record<string, User[]> = {};
+    const usersNoDept: User[] = [];
+    for (const u of users) {
+      const did = u.departmentId || '';
+      if (did && deptById[did]) {
+        (usersByDeptId[did] ||= []).push(u);
+      } else {
+        usersNoDept.push(u);
+      }
+    }
+
+    const usersByBranchNoDept: Record<string, User[]> = {};
+    const orphanUsers: User[] = [];
+    for (const u of usersNoDept) {
+      const bid = u.branchId || '';
+      if (bid && branchById[bid]) {
+        (usersByBranchNoDept[bid] ||= []).push(u);
+      } else {
+        orphanUsers.push(u);
+      }
+    }
+
+    const out: OwnerTreeRow[] = [];
+
+    for (const b of [...branches].sort((a, bb) => byName(a.name, bb.name))) {
+      const br = branchRow(b);
+      const brMatches = matches(br);
+
+      const children: OwnerTreeRow[] = [];
+      const depts = [...(deptsByBranchId[b.id] || [])].sort((a, bb) => byName(a.name, bb.name));
+
+      for (const d of depts) {
+        const dr = deptRow(d);
+        const drMatches = brMatches || matches(dr);
+        const deptUsers = [...(usersByDeptId[d.id] || [])].sort((a, bb) => byName(a.fullName || a.username, bb.fullName || bb.username));
+
+        const employeeRows: OwnerTreeRow[] = [];
+        for (const u of deptUsers) {
+          const ur = userRow(u);
+          if (drMatches || matches(ur)) {
+            employeeRows.push({ ...ur, level: 2 });
+          }
+        }
+
+        if (drMatches || employeeRows.length > 0) {
+          children.push({ ...dr, level: 1 });
+          children.push(...employeeRows);
+        }
+      }
+
+      const branchUsers = [...(usersByBranchNoDept[b.id] || [])].sort((a, bb) => byName(a.fullName || a.username, bb.fullName || bb.username));
+      for (const u of branchUsers) {
+        const ur = userRow(u);
+        if (brMatches || matches(ur)) {
+          children.push({ ...ur, level: 2 });
+        }
+      }
+
+      if (brMatches || children.length > 0) {
+        out.push({ ...br, level: 0 });
+        out.push(...children);
+      }
+    }
+
+    // Orphan departments (no branch / unknown branch)
+    for (const d of [...orphanDepts].sort((a, bb) => byName(a.name, bb.name))) {
+      const dr = deptRow(d);
+      const drMatches = matches(dr);
+      const deptUsers = [...(usersByDeptId[d.id] || [])].sort((a, bb) => byName(a.fullName || a.username, bb.fullName || bb.username));
+
+      const employeeRows: OwnerTreeRow[] = [];
+      for (const u of deptUsers) {
+        const ur = userRow(u);
+        if (drMatches || matches(ur)) {
+          employeeRows.push({ ...ur, level: 1 });
+        }
+      }
+
+      if (drMatches || employeeRows.length > 0) {
+        out.push({ ...dr, level: 0 });
+        out.push(...employeeRows);
+      }
+    }
+
+    // Orphan users (no department and no branch)
+    const extraUsers = [...orphanUsers].sort((a, bb) => byName(a.fullName || a.username, bb.fullName || bb.username));
+    for (const u of extraUsers) {
+      const ur = userRow(u);
+      if (matches(ur)) {
+        out.push({ ...ur, level: 0 });
+      }
+    }
+
+    return out;
+  }, [canManage, query, users, departments, branches, activeCounts, deptById, branchById]);
 
   const [selected, setSelected] = useState<OwnerRow | null>(null);
 
@@ -434,19 +539,11 @@ export function Users() {
 
       <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center gap-3">
-          <div className="flex items-center gap-2">
-            <Button variant={tab === 'EMPLOYEE' ? 'default' : 'outline'} size="sm" onClick={() => setTab('EMPLOYEE')}>
-              <UsersIcon className="w-4 h-4 mr-2" />
-              {t('users.tab.employees')}
-            </Button>
-            <Button variant={tab === 'DEPARTMENT' ? 'default' : 'outline'} size="sm" onClick={() => setTab('DEPARTMENT')}>
-              <Building2 className="w-4 h-4 mr-2" />
-              {t('users.tab.departments')}
-            </Button>
-            <Button variant={tab === 'BRANCH' ? 'default' : 'outline'} size="sm" onClick={() => setTab('BRANCH')}>
-              <Package className="w-4 h-4 mr-2" />
-              {t('users.tab.branches')}
-            </Button>
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <Building2 className="w-4 h-4" />
+            <span>
+              {t('users.tab.branches')} → {t('users.tab.departments')} → {t('users.tab.employees')}
+            </span>
           </div>
 
           <div className="md:ml-auto w-full md:w-80">
@@ -480,7 +577,7 @@ export function Users() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {filteredRows.length === 0 ? (
+              {treeRows.length === 0 ? (
                 <tr>
                   <td colSpan={3} className="px-6 py-12 text-center">
                     <UserIcon className="w-12 h-12 text-gray-300 mx-auto mb-3" />
@@ -488,14 +585,35 @@ export function Users() {
                   </td>
                 </tr>
               ) : (
-                filteredRows.map((r) => (
-                  <tr key={getKey(r.ownerType, r.ownerId)} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="min-w-0">
-                        <p className="font-medium text-gray-900 truncate">{r.title}</p>
-                        {r.subtitle && <p className="text-sm text-gray-500 truncate">{r.subtitle}</p>}
-                      </div>
-                    </td>
+                treeRows.map((r) => {
+                  const indent = r.level === 0 ? '' : r.level === 1 ? 'pl-8' : 'pl-14';
+                  const icon =
+                    r.ownerType === 'BRANCH' ? (
+                      <Building2 className="w-4 h-4 text-gray-500" />
+                    ) : r.ownerType === 'DEPARTMENT' ? (
+                      <Building2 className="w-4 h-4 text-gray-400" />
+                    ) : (
+                      <UsersIcon className="w-4 h-4 text-gray-400" />
+                    );
+
+                  return (
+                    <tr
+                      key={getKey(r.ownerType, r.ownerId)}
+                      className={`transition-colors ${r.ownerType === 'BRANCH' ? 'bg-gray-50/60 hover:bg-gray-50' : 'hover:bg-gray-50'}`}
+                    >
+                      <td className="px-6 py-4">
+                        <div className={`min-w-0 flex items-start gap-3 ${indent}`}>
+                          <div className="mt-0.5 flex-shrink-0">{icon}</div>
+                          <div className="min-w-0">
+                            <p
+                              className={`truncate ${r.ownerType === 'BRANCH' ? 'font-semibold text-gray-900' : 'font-medium text-gray-900'}`}
+                            >
+                              {r.title}
+                            </p>
+                            {r.subtitle && <p className="text-sm text-gray-500 truncate">{r.subtitle}</p>}
+                          </div>
+                        </div>
+                      </td>
                     <td className="px-6 py-4">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
                         {t('common.count', { count: r.count })}
@@ -513,8 +631,9 @@ export function Users() {
                         )}
                       </div>
                     </td>
-                  </tr>
-                ))
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

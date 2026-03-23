@@ -111,6 +111,7 @@ public class Asset {
   public void setName(String name) { this.name = name; }
   public void setType(String type) { this.type = type; }
   public void setCategoryCode(String categoryCode) { this.categoryCode = categoryCode; }
+  public void setSerialNumber(String serialNumber) { this.serialNumber = serialNumber; }
   public void setDescription(String description) { this.description = description; }
   public void setInventoryTag(String inventoryTag) { this.inventoryTag = inventoryTag; }
   public void setModel(String model) { this.model = model; }

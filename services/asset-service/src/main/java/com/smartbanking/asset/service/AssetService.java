@@ -114,6 +114,7 @@ public class AssetService {
         "assetId", asset.getId().toString(),
         "entityType", "ASSET",
         "entityId", asset.getId().toString(),
+        "name", asset.getName(),
         "serialNumber", asset.getSerialNumber(),
         "status", asset.getStatus().name(),
         "categoryCode", asset.getCategoryCode()
@@ -260,6 +261,8 @@ public class AssetService {
         "assetId", assetId.toString(),
         "entityType", "ASSET",
         "entityId", assetId.toString(),
+        "name", asset.getName(),
+        "serialNumber", asset.getSerialNumber(),
         "fromStatus", from.name(),
         "toStatus", AssetStatus.ASSIGNED.name(),
         "ownerType", req.ownerType().name(),
@@ -287,6 +290,8 @@ public class AssetService {
         "assetId", assetId.toString(),
         "entityType", "ASSET",
         "entityId", assetId.toString(),
+        "name", asset.getName(),
+        "serialNumber", asset.getSerialNumber(),
         "fromStatus", from.name(),
         "toStatus", next.name(),
         "reason", req.reason()
@@ -319,6 +324,8 @@ public class AssetService {
         "assetId", assetId.toString(),
         "entityType", "ASSET",
         "entityId", assetId.toString(),
+        "name", asset.getName(),
+        "serialNumber", asset.getSerialNumber(),
         "fromStatus", from.name(),
         "toStatus", req.toStatus().name(),
         "reason", req.reason()
@@ -332,9 +339,13 @@ public class AssetService {
     if (!categoryRepo.existsById(req.categoryCode())) {
       throw new BadRequestException("Unknown categoryCode: " + req.categoryCode());
     }
+    if (!asset.getSerialNumber().equals(req.serialNumber()) && assetRepo.existsBySerialNumber(req.serialNumber())) {
+      throw new ConflictException("serialNumber already exists");
+    }
     asset.setName(req.name());
     asset.setType(req.type());
     asset.setCategoryCode(req.categoryCode());
+    asset.setSerialNumber(req.serialNumber());
     asset.setDescription(req.description());
     asset.setInventoryTag(req.inventoryTag());
     asset.setModel(req.model());
@@ -348,7 +359,12 @@ public class AssetService {
     outbox.enqueue("AssetUpdated", "ASSET", assetId, actor, correlationId, Map.of(
         "assetId", assetId.toString(),
         "entityType", "ASSET",
-        "entityId", assetId.toString()
+        "entityId", assetId.toString(),
+        "serialNumber", asset.getSerialNumber(),
+        "name", asset.getName(),
+        "type", asset.getType(),
+        "categoryCode", asset.getCategoryCode(),
+        "status", asset.getStatus().name()
     ));
     return asset;
   }
@@ -405,6 +421,7 @@ public class AssetService {
         "assetId", assetId.toString(),
         "entityType", "ASSET",
         "entityId", assetId.toString(),
+        "name", asset.getName(),
         "serialNumber", asset.getSerialNumber(),
         "status", asset.getStatus().name(),
         "categoryCode", asset.getCategoryCode(),

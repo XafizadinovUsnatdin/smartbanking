@@ -115,6 +115,7 @@ export interface UpdateAssetRequest {
   name: string;
   type: string;
   categoryCode: string;
+  serialNumber: string;
   description?: string | null;
   inventoryTag?: string | null;
   model?: string | null;

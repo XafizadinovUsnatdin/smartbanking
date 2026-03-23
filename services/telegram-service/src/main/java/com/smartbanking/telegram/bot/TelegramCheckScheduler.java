@@ -89,12 +89,11 @@ public class TelegramCheckScheduler {
       var a = items.get(i).asset();
       String assetId = a.id().toString();
       rows.add(List.of(
-          new InlineKeyboardButton("Xa", "chk:ok:" + assetId),
-          new InlineKeyboardButton("Yo'q", "chk:bad:" + assetId)
+          new InlineKeyboardButton("✅ Ha", "chk:ok:" + assetId),
+          new InlineKeyboardButton("❌ Yo'q", "chk:bad:" + assetId)
       ));
     }
 
     telegram.sendMessage(u.telegramChatId(), sb.toString().trim(), new InlineKeyboardMarkup(rows));
   }
 }
-

@@ -39,10 +39,10 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center p-4">
+    <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-slate-50 via-amber-50 to-yellow-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute -top-28 -left-28 w-[28rem] h-[28rem] bg-blue-200/40 rounded-full blur-3xl" />
-        <div className="absolute -bottom-28 -right-28 w-[28rem] h-[28rem] bg-indigo-200/40 rounded-full blur-3xl" />
+        <div className="absolute -top-28 -left-28 w-[28rem] h-[28rem] bg-amber-200/40 rounded-full blur-3xl" />
+        <div className="absolute -bottom-28 -right-28 w-[28rem] h-[28rem] bg-yellow-200/40 rounded-full blur-3xl" />
       </div>
 
       <div className="relative w-full max-w-5xl bg-white/90 backdrop-blur rounded-3xl shadow-2xl border border-white/60 overflow-hidden">
@@ -50,8 +50,8 @@ export function Login() {
           {/* Left: form */}
           <div className="p-7 sm:p-10 lg:p-12">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center shadow-sm">
-                <Building2 className="w-6 h-6 text-white" />
+              <div className="w-12 h-12 bg-gradient-to-br from-[#e7c56a] via-[#d7b04b] to-[#b88a2e] rounded-2xl flex items-center justify-center shadow-sm">
+                <Building2 className="w-6 h-6 text-[#111827]" />
               </div>
               <div>
                 <h1 className="text-xl sm:text-2xl font-bold text-gray-900 leading-tight">{t('app.name')}</h1>
@@ -104,7 +104,11 @@ export function Login() {
                 </div>
               </div>
 
-              <Button type="submit" className="w-full h-12 text-base" disabled={loading}>
+              <Button
+                type="submit"
+                className="w-full h-12 text-base bg-gradient-to-r from-[#e7c56a] via-[#d7b04b] to-[#b88a2e] text-[#111827] hover:brightness-95"
+                disabled={loading}
+              >
                 <LogIn className="w-5 h-5 mr-2" />
                 {loading ? t('login.wait') : t('login.submit')}
               </Button>
@@ -112,13 +116,13 @@ export function Login() {
           </div>
 
           {/* Right: visual */}
-          <div className="hidden lg:block relative bg-gradient-to-br from-blue-600 via-indigo-600 to-slate-900 text-white p-12">
+          <div className="hidden lg:block relative bg-gradient-to-br from-[#e7c56a] via-[#d7b04b] to-[#111827] text-white p-12">
             <div className="absolute inset-0 opacity-40 pointer-events-none">
               <svg viewBox="0 0 800 600" className="w-full h-full">
                 <defs>
                   <linearGradient id="g1" x1="0" x2="1" y1="0" y2="1">
-                    <stop offset="0" stopColor="#60a5fa" stopOpacity="0.65" />
-                    <stop offset="1" stopColor="#a78bfa" stopOpacity="0.35" />
+                    <stop offset="0" stopColor="#e7c56a" stopOpacity="0.55" />
+                    <stop offset="1" stopColor="#b88a2e" stopOpacity="0.25" />
                   </linearGradient>
                 </defs>
                 <circle cx="640" cy="120" r="140" fill="url(#g1)" />

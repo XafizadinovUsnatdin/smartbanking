@@ -15,6 +15,7 @@ export interface AuditSearchParams {
   eventType?: string;
   from?: string;
   to?: string;
+  sort?: string;
   page?: number;
   size?: number;
 }
@@ -26,6 +27,7 @@ export async function searchAudit(params: AuditSearchParams = {}): Promise<Sprin
   if (params.eventType) qs.set('eventType', params.eventType);
   if (params.from) qs.set('from', params.from);
   if (params.to) qs.set('to', params.to);
+  if (params.sort) qs.set('sort', params.sort);
   if (typeof params.page === 'number') qs.set('page', String(params.page));
   if (typeof params.size === 'number') qs.set('size', String(params.size));
   const base = apiBase.audit.replace(/\/+$/, '');

@@ -8,6 +8,7 @@ import { formatDateTime } from '../lib/utils';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { useI18n } from '../i18n/I18nProvider';
+import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 function safeJson(json: string): any | null {
@@ -89,25 +90,59 @@ function humanizeAudit(eventType: string, p: any, t: (k: string, params?: any) =
   }
 }
 
+function toDateInputValue(d: Date) {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function dateInputToIsoStart(dateStr: string) {
+  if (!dateStr) return undefined;
+  const [y, m, d] = dateStr.split('-').map((x) => Number.parseInt(x, 10));
+  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return undefined;
+  return new Date(y, m - 1, d, 0, 0, 0, 0).toISOString();
+}
+
+function dateInputToIsoEnd(dateStr: string) {
+  if (!dateStr) return undefined;
+  const [y, m, d] = dateStr.split('-').map((x) => Number.parseInt(x, 10));
+  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return undefined;
+  return new Date(y, m - 1, d, 23, 59, 59, 999).toISOString();
+}
+
 export function AuditLogs() {
   const { t } = useI18n();
   const [loading, setLoading] = useState(true);
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [entityType, setEntityType] = useState<'ASSET' | 'ASSET_REQUEST'>('ASSET');
   const [searchQuery, setSearchQuery] = useState('');
+  const [fromDate, setFromDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return toDateInputValue(d);
+  });
+  const [toDate, setToDate] = useState(() => toDateInputValue(new Date()));
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
 
   useEffect(() => {
     setPage(0);
-  }, [entityType]);
+  }, [entityType, fromDate, toDate]);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
       try {
-        const resp = await searchAudit({ entityType, page, size: 50 });
+        const resp = await searchAudit({
+          entityType,
+          from: dateInputToIsoStart(fromDate),
+          to: dateInputToIsoEnd(toDate),
+          sort: 'occurredAt,desc',
+          page,
+          size: 50,
+        });
         setLogs(resp.content || []);
         setTotalPages(resp.totalPages || 0);
         setTotalElements(resp.totalElements || 0);
@@ -117,7 +152,7 @@ export function AuditLogs() {
         setLoading(false);
       }
     })();
-  }, [page, entityType]);
+  }, [page, entityType, fromDate, toDate]);
 
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -157,6 +192,14 @@ export function AuditLogs() {
                 <SelectItem value="ASSET_REQUEST">{t('audit.entityType.ASSET_REQUEST')}</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+          <div className="md:w-44">
+            <Label className="text-xs text-gray-600 mb-1">{t('audit.filter.from')}</Label>
+            <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+          </div>
+          <div className="md:w-44">
+            <Label className="text-xs text-gray-600 mb-1">{t('audit.filter.to')}</Label>
+            <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
           </div>
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />

@@ -1,6 +1,7 @@
 package com.smartbanking.telegram.clients;
 
 import com.smartbanking.telegram.clients.dto.IdentityUser;
+import com.smartbanking.telegram.clients.dto.IdentityDepartment;
 import com.smartbanking.telegram.security.ServiceAuth;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.Set;
@@ -41,6 +42,14 @@ public class IdentityClient {
         .header(HttpHeaders.AUTHORIZATION, "Bearer " + serviceAuth.serviceToken())
         .retrieve()
         .body(IdentityUser.class);
+  }
+
+  public IdentityDepartment getDepartment(UUID departmentId) {
+    return http.get()
+        .uri("/departments/{id}", departmentId)
+        .header(HttpHeaders.AUTHORIZATION, "Bearer " + serviceAuth.serviceToken())
+        .retrieve()
+        .body(IdentityDepartment.class);
   }
 
   public Optional<IdentityUser> lookupByTelegramUserId(long telegramUserId) {

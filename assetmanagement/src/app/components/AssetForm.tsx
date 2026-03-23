@@ -127,7 +127,7 @@ export function AssetForm() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name.trim() || !form.type.trim() || !form.categoryCode.trim() || (!isEdit && !form.serialNumber.trim())) {
+    if (!form.name.trim() || !form.type.trim() || !form.categoryCode.trim() || !form.serialNumber.trim()) {
       toast.error(t('error.fillRequired'));
       return;
     }
@@ -192,6 +192,7 @@ export function AssetForm() {
         name: form.name.trim(),
         type: form.type.trim(),
         categoryCode: form.categoryCode,
+        serialNumber: form.serialNumber.trim(),
         description: form.description || null,
         inventoryTag: form.inventoryTag || null,
         model: form.model || null,
@@ -313,17 +314,16 @@ export function AssetForm() {
               </div>
               <div>
                 <Label htmlFor="serialNumber">
-                  {t('asset.field.serial')} {isEdit ? '' : '*'}
+                  {t('asset.field.serial')} *
                 </Label>
                 <Input
                   id="serialNumber"
                   value={form.serialNumber}
                   onChange={(e) => setForm({ ...form, serialNumber: e.target.value })}
                   placeholder="SN-0001"
-                  required={!isEdit}
-                  disabled={loading || isEdit}
+                  required
+                  disabled={loading}
                 />
-                {isEdit && <p className="text-xs text-gray-500 mt-1">{t('asset.form.serialLockedNote')}</p>}
               </div>
               <div className="md:col-span-2">
                 <Label htmlFor="description">{t('asset.field.description')}</Label>
