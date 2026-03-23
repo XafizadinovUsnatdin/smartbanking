@@ -1,0 +1,33 @@
+{
+  email {$CADDY_EMAIL}
+}
+
+# Single public API domain (path-based routing for microservices)
+# Example: https://smartbanking-api.tahlilchi-ai.uz
+smartbanking-api.{$PUBLIC_DOMAIN} {
+  encode gzip
+
+  # Identity service (strip /identity prefix)
+  handle_path /identity/* {
+    reverse_proxy identity-service:8081
+  }
+
+  # Asset service (strip /asset prefix)
+  handle_path /asset/* {
+    reverse_proxy asset-service:8082
+  }
+
+  # Services with already-prefixed endpoints
+  handle /audit* {
+    reverse_proxy audit-service:8083
+  }
+  handle /qr* {
+    reverse_proxy qr-service:8084
+  }
+  handle /analytics* {
+    reverse_proxy inventory-analytics-service:8085
+  }
+
+  respond "OK" 200
+}
+

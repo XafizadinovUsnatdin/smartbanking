@@ -50,10 +50,23 @@ git clone https://github.com/XafizadinovUsnatdin/smartbanking.git
 cd smartbanking
 ```
 
-VPS uchun tavsiya etilgan ishga tushirish usuli: `docker-compose.vps.yml`
+VPS uchun 2 xil qulay usul bor:
+
+Variant 1 (subdomain-based): `docker-compose.vps.yml`
 - faqat **80/443** portlar ochiq bo'ladi
 - Caddy avtomatik **HTTPS** qiladi (domain kerak)
 - UI (assetmanagement) ham VPS'da ishlaydi: `https://app.<domain>`
+- API servislar subdomainlarda: `identity.<domain>`, `asset.<domain>` va h.k.
+
+Variant 2 (gateway, Vercel uchun qulay): `docker-compose.vps.gateway.yml`
+- faqat **80/443** portlar ochiq
+- Bitta API domen: `https://smartbanking-api.<domain>`
+- Frontend Vercel/Cloudflare Pages’da bo‘lsa ham, `VITE_*` env’lar oson bo‘ladi:
+  - `VITE_IDENTITY_API=https://smartbanking-api.<domain>/identity`
+  - `VITE_ASSET_API=https://smartbanking-api.<domain>/asset`
+  - `VITE_AUDIT_API=https://smartbanking-api.<domain>`
+  - `VITE_QR_API=https://smartbanking-api.<domain>`
+  - `VITE_ANALYTICS_API=https://smartbanking-api.<domain>`
 
 `TELEGRAM_BOT_TOKEN` va boshqa secret'lar uchun `.env` yarating (git'ga qo'shmang):
 ```bash
@@ -69,19 +82,25 @@ JWT_SECRET=change-this-to-a-strong-random-32+chars
 QR_SECRET=change-this-to-a-strong-random-32+chars
 
 # Frontend origin (CORS)
-CORS_ALLOWED_ORIGINS=https://app.example.com
+CORS_ALLOWED_ORIGINS=https://app.example.com,https://smartbanking.example.com
 
 # QR payload opens the scanner page with token
-QR_PAYLOAD_BASE_URL=https://app.example.com
+QR_PAYLOAD_BASE_URL=https://smartbanking.example.com
 
 # Optional
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_CHECK_PERIOD_DAYS=30
 ```
 
-So'ng ishga tushiring:
+So'ng ishga tushiring (Variant 1):
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.vps.yml up -d --build
+docker compose ps
+```
+
+Yoki (Variant 2, gateway):
+```bash
+docker compose -f docker-compose.yml -f docker-compose.vps.gateway.yml up -d --build
 docker compose ps
 ```
 

@@ -1,0 +1,78 @@
+services:
+  # Expose only 80/443 on the VPS. Everything else stays inside the Docker network.
+  postgres:
+    ports: []
+
+  redis:
+    ports: []
+
+  zookeeper:
+    ports: []
+
+  kafka:
+    ports: []
+
+  identity-service:
+    ports: []
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      BOOTSTRAP_ADMIN_USERNAME: ${BOOTSTRAP_ADMIN_USERNAME:-admin}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-Admin1234!}
+      BOOTSTRAP_ADMIN_FULL_NAME: ${BOOTSTRAP_ADMIN_FULL_NAME:-System Admin}
+
+  asset-service:
+    ports: []
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+
+  audit-service:
+    ports: []
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+
+  qr-service:
+    ports: []
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      QR_SECRET: ${QR_SECRET}
+      QR_PAYLOAD_BASE_URL: ${QR_PAYLOAD_BASE_URL}
+
+  inventory-analytics-service:
+    ports: []
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+
+  telegram-service:
+    ports: []
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      KAFKA_LISTENERS_ENABLED: ${KAFKA_LISTENERS_ENABLED:-true}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHECK_PERIOD_DAYS: ${TELEGRAM_CHECK_PERIOD_DAYS:-30}
+
+  # Public HTTPS gateway on a single domain: smartbanking-api.<PUBLIC_DOMAIN>
+  api-gateway:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - identity-service
+      - asset-service
+      - audit-service
+      - qr-service
+      - inventory-analytics-service
+    environment:
+      PUBLIC_DOMAIN: ${PUBLIC_DOMAIN}
+      CADDY_EMAIL: ${CADDY_EMAIL}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/caddy/Caddyfile.gateway:/etc/caddy/Caddyfile:ro
+      - ./.data/caddy/data:/data
+      - ./.data/caddy/config:/config
+
