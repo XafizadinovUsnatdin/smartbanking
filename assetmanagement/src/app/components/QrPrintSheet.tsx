@@ -18,11 +18,6 @@ export function QrPrintSheet() {
   const { accessToken } = useAuth();
   const location = useLocation();
 
-  if (!accessToken) {
-    const next = encodeURIComponent(`${location.pathname}${location.search || ''}`);
-    return <Navigate to={`/login?next=${next}`} replace />;
-  }
-
   const [loading, setLoading] = useState(false);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [totalItems, setTotalItems] = useState(0);
@@ -30,6 +25,7 @@ export function QrPrintSheet() {
   const [qrPayloadByAssetId, setQrPayloadByAssetId] = useState<Record<string, string>>({});
 
   useEffect(() => {
+    if (!accessToken) return;
     (async () => {
       setLoading(true);
       try {
@@ -89,7 +85,12 @@ export function QrPrintSheet() {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.search]);
+  }, [location.search, accessToken]);
+
+  if (!accessToken) {
+    const next = encodeURIComponent(`${location.pathname}${location.search || ''}`);
+    return <Navigate to={`/login?next=${next}`} replace />;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
