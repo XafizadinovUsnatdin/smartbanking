@@ -41,7 +41,7 @@ Open in browser:
    - `npm run dev`
 2. Open UI:
    - `http://localhost:5173/login`
-   - Login: `admin` / `Admin1234!`
+   - Login: 
 
 ## Deployment (Vercel / Cloudflare / Railway)
 
