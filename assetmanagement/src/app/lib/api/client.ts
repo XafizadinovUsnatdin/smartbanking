@@ -68,7 +68,8 @@ async function doFetch<T>(
   const token = getAccessToken();
   const headers: Record<string, string> = { ...(options.headers as Record<string, string> | undefined) };
 
-  if (!headers['Content-Type'] && !isFormData(options.body)) {
+  const hasBody = options.body !== undefined && options.body !== null;
+  if (hasBody && !headers['Content-Type'] && !isFormData(options.body)) {
     headers['Content-Type'] = 'application/json';
   }
   if (token) {
