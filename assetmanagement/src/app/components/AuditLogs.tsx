@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
-import { Calendar, History, Package, Search, User } from 'lucide-react';
+import { Calendar, History, Package, Search, User as UserIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { searchAudit } from '../lib/api/audit';
-import type { AuditLog } from '../types';
+import { listBranches, listDepartments, listUsers } from '../lib/api/identity';
+import type { AuditLog, Branch, Department, User as IdentityUser } from '../types';
 import { formatDateTime } from '../lib/utils';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
@@ -24,12 +25,24 @@ function fmtStatus(code: string, t: (k: string, params?: any) => string) {
   return t(`status.${code}`);
 }
 
-function fmtOwner(ownerType: string, ownerId: string, t: (k: string, params?: any) => string) {
+function fmtOwner(
+  ownerType: string,
+  ownerId: string,
+  t: (k: string, params?: any) => string,
+  resolveOwner?: (ownerType: string, ownerId: string) => string | null,
+) {
   if (!ownerType || !ownerId) return '';
-  return `${t(`ownerType.${ownerType}`)} ${ownerId}`;
+  const resolved = resolveOwner ? resolveOwner(ownerType, ownerId) : null;
+  if (resolved) return resolved;
+  return `${t(`ownerType.${ownerType}`)}: ${ownerId}`;
 }
 
-function humanizeAudit(eventType: string, p: any, t: (k: string, params?: any) => string): string {
+function humanizeAudit(
+  eventType: string,
+  p: any,
+  t: (k: string, params?: any) => string,
+  resolveOwner?: (ownerType: string, ownerId: string) => string | null,
+): string {
   const serial = String(p?.serialNumber || '');
   const assetName = String(p?.name || '');
   const fromStatus = p?.fromStatus ? String(p.fromStatus) : '';
@@ -50,7 +63,7 @@ function humanizeAudit(eventType: string, p: any, t: (k: string, params?: any) =
       return t('audit.human.assetAssigned', {
         name: assetName || serial || '-',
         serial: serial || '-',
-        owner: fmtOwner(ownerType, ownerId, t) || '-',
+        owner: fmtOwner(ownerType, ownerId, t, resolveOwner) || '-',
       });
     case 'AssetUnassigned':
       return t('audit.human.assetReturned', {
@@ -117,6 +130,9 @@ export function AuditLogs() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [entityType, setEntityType] = useState<'ASSET' | 'ASSET_REQUEST'>('ASSET');
   const [searchQuery, setSearchQuery] = useState('');
+  const [users, setUsers] = useState<IdentityUser[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [fromDate, setFromDate] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() - 30);
@@ -126,6 +142,73 @@ export function AuditLogs() {
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
+
+  useEffect(() => {
+    (async () => {
+      const [usRes, depRes, brRes] = await Promise.allSettled([listUsers(), listDepartments(), listBranches()]);
+      setUsers(usRes.status === 'fulfilled' ? usRes.value : []);
+      setDepartments(depRes.status === 'fulfilled' ? depRes.value : []);
+      setBranches(brRes.status === 'fulfilled' ? brRes.value : []);
+    })();
+  }, []);
+
+  const userById = useMemo(() => {
+    const map: Record<string, IdentityUser> = {};
+    users.forEach((u) => (map[u.id] = u));
+    return map;
+  }, [users]);
+
+  const deptById = useMemo(() => {
+    const map: Record<string, Department> = {};
+    departments.forEach((d) => (map[d.id] = d));
+    return map;
+  }, [departments]);
+
+  const branchById = useMemo(() => {
+    const map: Record<string, Branch> = {};
+    branches.forEach((b) => (map[b.id] = b));
+    return map;
+  }, [branches]);
+
+  const resolveOwner = (ownerType: string, ownerId: string): string | null => {
+    const type = String(ownerType || '').trim().toUpperCase();
+    if (!type || !ownerId) return null;
+
+    if (type === 'EMPLOYEE') {
+      const u = userById[ownerId];
+      if (!u) return null;
+      const label = u.fullName || u.username || u.id;
+      return label ? `${t('ownerType.EMPLOYEE')}: ${label}` : null;
+    }
+
+    if (type === 'DEPARTMENT') {
+      const d = deptById[ownerId];
+      if (!d) return null;
+      const label = d.name || d.id;
+      return label ? `${t('ownerType.DEPARTMENT')}: ${label}` : null;
+    }
+
+    if (type === 'BRANCH') {
+      const b = branchById[ownerId];
+      if (!b) return null;
+      const label = b.name || b.id;
+      return label ? `${t('ownerType.BRANCH')}: ${label}` : null;
+    }
+
+    return null;
+  };
+
+  const formatActor = (actorId?: string | null) => {
+    const raw = (actorId || '').trim();
+    if (!raw) return t('audit.system');
+
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw);
+    if (isUuid) {
+      const u = userById[raw];
+      if (u) return u.fullName || u.username || raw;
+    }
+    return raw;
+  };
 
   useEffect(() => {
     setPage(0);
@@ -175,7 +258,7 @@ export function AuditLogs() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold text-gray-900">{t('page.audit.title')}</h2>
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">{t('page.audit.title')}</h2>
           <p className="text-gray-500 mt-1">{t('page.audit.subtitle')}</p>
         </div>
       </div>
@@ -252,14 +335,14 @@ export function AuditLogs() {
               const requesterUsername = p?.requesterUsername ? String(p.requesterUsername) : '';
 
               const metaParts = [
-                fromStatus && toStatus ? `${t('audit.meta.status')}: ${fmtStatus(fromStatus, t)} → ${fmtStatus(toStatus, t)}` : null,
-                ownerType && ownerId ? `${t('audit.meta.owner')}: ${fmtOwner(ownerType, ownerId, t)}` : null,
+                fromStatus && toStatus ? `${t('audit.meta.status')}: ${fmtStatus(fromStatus, t)} -> ${fmtStatus(toStatus, t)}` : null,
+                ownerType && ownerId ? `${t('audit.meta.owner')}: ${fmtOwner(ownerType, ownerId, t, resolveOwner)}` : null,
                 requestStatus && requesterUsername ? `${t('audit.meta.request')}: ${t(`requestStatus.${requestStatus}`)} (${requesterUsername})` : null,
                 reason ? `${t('audit.meta.reason')}: ${reason}` : null,
               ].filter(Boolean) as string[];
 
               const pretty = env ? JSON.stringify(env, null, 2) : null;
-              const human = humanizeAudit(log.eventType, p, t);
+              const human = humanizeAudit(log.eventType, p, t, resolveOwner);
               return (
                 <div key={log.id} className="p-6 hover:bg-gray-50 transition-colors">
                   <div className="flex gap-4">
@@ -300,8 +383,8 @@ export function AuditLogs() {
 
                           <div className="flex items-center gap-4 mt-3 text-xs text-gray-500">
                             <div className="flex items-center gap-1">
-                              <User className="w-3.5 h-3.5" />
-                              {log.actorId || t('audit.system')}
+                              <UserIcon className="w-3.5 h-3.5" />
+                              {formatActor(log.actorId)}
                             </div>
                             <div className="flex items-center gap-1">
                               <Calendar className="w-3.5 h-3.5" />

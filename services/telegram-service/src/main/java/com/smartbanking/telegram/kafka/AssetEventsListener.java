@@ -59,6 +59,7 @@ public class AssetEventsListener {
     if (p == null) return;
 
     String ownerType = p.get("ownerType") == null ? "" : String.valueOf(p.get("ownerType"));
+    String assignReason = p.get("assignReason") == null ? null : String.valueOf(p.get("assignReason"));
 
     UUID ownerId;
     UUID assetId;
@@ -108,13 +109,16 @@ public class AssetEventsListener {
       return;
     }
 
-    sendAssignedNotification(chatId, ownerType, ownerLabel, asset, interactive);
+    sendAssignedNotification(chatId, ownerType, ownerLabel, asset, interactive, assignReason);
   }
 
-  private void sendAssignedNotification(long chatId, String ownerType, String ownerLabel, Asset asset, boolean interactive) {
+  private void sendAssignedNotification(long chatId, String ownerType, String ownerLabel, Asset asset, boolean interactive, String assignReason) {
     if (asset == null) return;
 
     String header = "📌 Yangi aktiv biriktirildi";
+    if (interactive && assignReason != null && assignReason.toLowerCase().startsWith("fulfill request")) {
+      header = "Sizning aktivingiz tayyor bo'ldi";
+    }
     if ("DEPARTMENT".equalsIgnoreCase(ownerType) && ownerLabel != null && !ownerLabel.isBlank()) {
       header = header + " (" + ownerLabel.trim() + ")";
     }
@@ -191,7 +195,7 @@ public class AssetEventsListener {
     String header = switch (status) {
       case "APPROVED" -> "So'rovingiz tasdiqlandi.";
       case "REJECTED" -> "So'rovingiz rad etildi.";
-      case "FULFILLED" -> "So'rovingiz bajarildi.";
+      case "FULFILLED" -> "Sizning aktivingiz tayyor bo'ldi.";
       case "CANCELLED" -> "So'rovingiz bekor qilindi.";
       default -> null;
     };
@@ -200,6 +204,9 @@ public class AssetEventsListener {
     String text = header;
     if (note != null && !note.isBlank()) {
       text = text + "\n\nIzoh: " + note.trim();
+    }
+    if ("FULFILLED".equals(status)) {
+      text = text + "\n\nKo'rish: /myassets";
     }
     telegram.sendMessage(user.telegramChatId(), text);
   }

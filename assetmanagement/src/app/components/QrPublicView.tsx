@@ -73,7 +73,7 @@ export function QrPublicView() {
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       <div>
-        <h2 className="text-3xl font-bold text-gray-900">{t('page.qrPublic.title')}</h2>
+        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">{t('page.qrPublic.title')}</h2>
         <p className="text-gray-500 mt-1">{t('page.qrPublic.subtitle')}</p>
       </div>
 

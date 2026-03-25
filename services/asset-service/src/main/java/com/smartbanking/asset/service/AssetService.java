@@ -18,9 +18,12 @@ import com.smartbanking.asset.web.dto.ChangeStatusRequest;
 import com.smartbanking.asset.web.dto.CreateAssetRequest;
 import com.smartbanking.asset.web.dto.ReturnRequest;
 import com.smartbanking.asset.web.dto.UpdateAssetRequest;
+import jakarta.persistence.criteria.Predicate;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -61,6 +64,8 @@ public class AssetService {
 
   public record AssetSummary(List<AssetStatusCount> byStatus, List<AssetCategoryCount> byCategory) {}
 
+  public record ActiveAssignmentSummary(List<AssetStatusCount> byStatus, List<AssetCategoryCount> byCategory) {}
+
   public AssetSummary summary() {
     var byStatus = assetRepo.statusSummary().stream()
         .map(r -> new AssetStatusCount(r.getStatus(), r.getCount()))
@@ -69,6 +74,16 @@ public class AssetService {
         .map(r -> new AssetCategoryCount(r.getCategoryCode(), r.getCount()))
         .toList();
     return new AssetSummary(byStatus, byCategory);
+  }
+
+  public ActiveAssignmentSummary activeAssignmentSummary() {
+    var byStatus = assignmentRepo.countActiveByAssetStatus().stream()
+        .map(r -> new AssetStatusCount(r.getStatus(), r.getCount()))
+        .toList();
+    var byCategory = assignmentRepo.countActiveByAssetCategory().stream()
+        .map(r -> new AssetCategoryCount(r.getCategoryCode(), r.getCount()))
+        .toList();
+    return new ActiveAssignmentSummary(byStatus, byCategory);
   }
 
   @Transactional
@@ -231,6 +246,77 @@ public class AssetService {
     return assetRepo.findAll(spec, pageable);
   }
 
+  public record OwnerRef(OwnerType ownerType, UUID ownerId) {}
+
+  public Page<Asset> assignedToAnyOwners(
+      List<OwnerRef> owners,
+      Optional<String> q,
+      Optional<String> categoryCode,
+      Optional<AssetStatus> status,
+      Pageable pageable
+  ) {
+    if (owners == null || owners.isEmpty()) {
+      throw new BadRequestException("owners are required");
+    }
+
+    Map<OwnerType, List<UUID>> idsByType = owners.stream()
+        .filter(o -> o != null && o.ownerType() != null && o.ownerId() != null)
+        .collect(java.util.stream.Collectors.groupingBy(
+            OwnerRef::ownerType,
+            java.util.stream.Collectors.mapping(OwnerRef::ownerId, java.util.stream.Collectors.toList())
+        ));
+
+    if (idsByType.isEmpty()) {
+      throw new BadRequestException("owners are required");
+    }
+
+    Specification<Asset> spec = (root, query, cb) -> cb.conjunction();
+    spec = spec.and((root, query, cb) -> cb.isNull(root.get("deletedAt")));
+
+    spec = spec.and((root, query, cb) -> {
+      Subquery<UUID> sq = query.subquery(UUID.class);
+      Root<AssetAssignment> asg = sq.from(AssetAssignment.class);
+      sq.select(asg.get("assetId"));
+
+      List<Predicate> ownerPreds = new ArrayList<>();
+      idsByType.forEach((type, ids) -> {
+        if (type == null || ids == null || ids.isEmpty()) return;
+        ownerPreds.add(cb.and(
+            cb.equal(asg.get("ownerType"), type),
+            asg.get("ownerId").in(ids)
+        ));
+      });
+
+      if (ownerPreds.isEmpty()) {
+        return cb.disjunction();
+      }
+
+      sq.where(cb.and(
+          cb.isNull(asg.get("returnedAt")),
+          cb.or(ownerPreds.toArray(new Predicate[0]))
+      ));
+      return root.get("id").in(sq);
+    });
+
+    if (q != null && q.isPresent()) {
+      String like = "%" + q.get().toLowerCase() + "%";
+      spec = spec.and((root, query, cb) -> cb.or(
+          cb.like(cb.lower(root.get("name")), like),
+          cb.like(cb.lower(root.get("type")), like),
+          cb.like(cb.lower(root.get("serialNumber")), like),
+          cb.like(cb.lower(root.get("inventoryTag")), like)
+      ));
+    }
+    if (categoryCode != null && categoryCode.isPresent()) {
+      spec = spec.and((root, query, cb) -> cb.equal(root.get("categoryCode"), categoryCode.get()));
+    }
+    if (status != null && status.isPresent()) {
+      spec = spec.and((root, query, cb) -> cb.equal(root.get("status"), status.get()));
+    }
+
+    return assetRepo.findAll(spec, pageable);
+  }
+
   public Asset get(UUID id) {
     return assetRepo.findByIdAndDeletedAtIsNull(id).orElseThrow(() -> new NotFoundException("Asset not found"));
   }
@@ -257,17 +343,18 @@ public class AssetService {
     AssetStatus from = asset.getStatus();
     transitionStatus(asset, AssetStatus.ASSIGNED, "Assigned to " + req.ownerType() + ":" + req.ownerId(), actor);
 
-    outbox.enqueue("AssetAssigned", "ASSET", assetId, actor, correlationId, Map.of(
-        "assetId", assetId.toString(),
-        "entityType", "ASSET",
-        "entityId", assetId.toString(),
-        "name", asset.getName(),
-        "serialNumber", asset.getSerialNumber(),
-        "fromStatus", from.name(),
-        "toStatus", AssetStatus.ASSIGNED.name(),
-        "ownerType", req.ownerType().name(),
-        "ownerId", req.ownerId().toString()
-    ));
+    Map<String, Object> payload = new HashMap<>();
+    payload.put("assetId", assetId.toString());
+    payload.put("entityType", "ASSET");
+    payload.put("entityId", assetId.toString());
+    payload.put("name", asset.getName());
+    payload.put("serialNumber", asset.getSerialNumber());
+    payload.put("fromStatus", from.name());
+    payload.put("toStatus", AssetStatus.ASSIGNED.name());
+    payload.put("ownerType", req.ownerType().name());
+    payload.put("ownerId", req.ownerId().toString());
+    payload.put("assignReason", req.reason());
+    outbox.enqueue("AssetAssigned", "ASSET", assetId, actor, correlationId, payload);
     return asset;
   }
 
@@ -286,16 +373,16 @@ public class AssetService {
     AssetStatus from = asset.getStatus();
     transitionStatus(asset, next, "Returned. " + req.reason(), actor);
 
-    outbox.enqueue("AssetUnassigned", "ASSET", assetId, actor, correlationId, Map.of(
-        "assetId", assetId.toString(),
-        "entityType", "ASSET",
-        "entityId", assetId.toString(),
-        "name", asset.getName(),
-        "serialNumber", asset.getSerialNumber(),
-        "fromStatus", from.name(),
-        "toStatus", next.name(),
-        "reason", req.reason()
-    ));
+    Map<String, Object> payload = new HashMap<>();
+    payload.put("assetId", assetId.toString());
+    payload.put("entityType", "ASSET");
+    payload.put("entityId", assetId.toString());
+    payload.put("name", asset.getName());
+    payload.put("serialNumber", asset.getSerialNumber());
+    payload.put("fromStatus", from.name());
+    payload.put("toStatus", next.name());
+    payload.put("reason", req.reason());
+    outbox.enqueue("AssetUnassigned", "ASSET", assetId, actor, correlationId, payload);
     return asset;
   }
 
@@ -320,16 +407,16 @@ public class AssetService {
 
     transitionStatus(asset, req.toStatus(), req.reason(), actor);
 
-    outbox.enqueue("AssetStatusChanged", "ASSET", assetId, actor, correlationId, Map.of(
-        "assetId", assetId.toString(),
-        "entityType", "ASSET",
-        "entityId", assetId.toString(),
-        "name", asset.getName(),
-        "serialNumber", asset.getSerialNumber(),
-        "fromStatus", from.name(),
-        "toStatus", req.toStatus().name(),
-        "reason", req.reason()
-    ));
+    Map<String, Object> payload = new HashMap<>();
+    payload.put("assetId", assetId.toString());
+    payload.put("entityType", "ASSET");
+    payload.put("entityId", assetId.toString());
+    payload.put("name", asset.getName());
+    payload.put("serialNumber", asset.getSerialNumber());
+    payload.put("fromStatus", from.name());
+    payload.put("toStatus", req.toStatus().name());
+    payload.put("reason", req.reason());
+    outbox.enqueue("AssetStatusChanged", "ASSET", assetId, actor, correlationId, payload);
     return asset;
   }
 

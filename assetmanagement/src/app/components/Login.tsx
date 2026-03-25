@@ -144,7 +144,7 @@ export function Login() {
                 <span>{t('login.hero.badge')}</span>
               </div>
 
-              <h3 className="mt-6 text-3xl font-extrabold leading-tight">
+              <h3 className="mt-6 text-2xl sm:text-3xl font-extrabold leading-tight">
                 {t('login.hero.title')}
               </h3>
               <p className="mt-3 text-white/80 text-sm leading-relaxed max-w-md">

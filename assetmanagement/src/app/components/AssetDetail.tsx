@@ -376,7 +376,7 @@ export function AssetDetail() {
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
-            <h2 className="text-3xl font-bold text-gray-900">{asset?.name || '...'}</h2>
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">{asset?.name || '...'}</h2>
             <p className="text-gray-500 mt-1">{asset?.serialNumber || ''}</p>
           </div>
         </div>

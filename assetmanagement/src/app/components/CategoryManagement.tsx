@@ -93,7 +93,7 @@ export function CategoryManagement() {
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-3xl font-bold text-gray-900">{t('page.categories.title')}</h2>
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">{t('page.categories.title')}</h2>
           <p className="text-gray-500 mt-1">{t('page.categories.subtitle')}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -192,4 +192,3 @@ export function CategoryManagement() {
     </div>
   );
 }
-

@@ -189,6 +189,15 @@ export const translations: Record<Lang, Record<string, string>> = {
     'dashboard.byDepartment.subtitle': "Faol biriktirishlar",
     'dashboard.byDepartment.empty': 'Statistika mavjud emas',
 
+    'dashboard.active.title': "Biriktirilgan (qo'shimcha)",
+    'dashboard.active.subtitle': 'Faol biriktirilgan aktivlar bo‘yicha',
+    'dashboard.active.topCategories': 'Top kategoriyalar',
+    'dashboard.active.empty': "Ma'lumot yo'q",
+
+    'dashboard.agingByDepartment.title': "Bo'lim bo'yicha (eskirgan)",
+    'dashboard.agingByDepartment.subtitle': "Eskirgan va biriktirilgan aktivlar (>{days} kun)",
+    'dashboard.agingByDepartment.empty': "Eskirgan biriktirilgan aktivlar yo'q",
+
     'assets.searchPlaceholder': "Nom, serial raqam yoki tur bo'yicha qidirish...",
     'assets.filter.status': 'Status',
     'assets.filter.category': 'Kategoriya',
@@ -620,6 +629,15 @@ export const translations: Record<Lang, Record<string, string>> = {
     'dashboard.byDepartment.title': 'By department (assigned)',
     'dashboard.byDepartment.subtitle': 'Active assignments',
     'dashboard.byDepartment.empty': 'No data',
+
+    'dashboard.active.title': 'Assigned (extra)',
+    'dashboard.active.subtitle': 'Active assigned assets',
+    'dashboard.active.topCategories': 'Top categories',
+    'dashboard.active.empty': 'No data',
+
+    'dashboard.agingByDepartment.title': 'By department (aging)',
+    'dashboard.agingByDepartment.subtitle': 'Aging assigned assets (>{days} days)',
+    'dashboard.agingByDepartment.empty': 'No aging assigned assets',
 
     'assets.searchPlaceholder': 'Search by name, serial number, or type...',
     'assets.filter.status': 'Status',

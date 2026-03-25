@@ -17,6 +17,7 @@ public class BotStateRepository {
 
   private static final String OFFSET_KEY = "tg:offset";
   private static final String LAST_CHECK_PREFIX = "tg:lastcheck:";
+  private static final String LAST_AGING_PREFIX = "tg:lastaging:";
   private static final String ISSUE_PREFIX = "tg:issue:";
   private static final String SIGNUP_WIZARD_PREFIX = "tg:signup:wiz:";
   private static final String SIGNUP_REQUEST_PREFIX = "tg:signup:req:";
@@ -59,6 +60,22 @@ public class BotStateRepository {
   public void setLastCheckSent(UUID userId, Instant when) {
     if (userId == null || when == null) return;
     redis.opsForValue().set(LAST_CHECK_PREFIX + userId, when.toString());
+  }
+
+  public Optional<Instant> getLastAgingSent(UUID userId) {
+    if (userId == null) return Optional.empty();
+    try {
+      String raw = redis.opsForValue().get(LAST_AGING_PREFIX + userId);
+      if (raw == null || raw.isBlank()) return Optional.empty();
+      return Optional.of(Instant.parse(raw));
+    } catch (Exception ignored) {
+      return Optional.empty();
+    }
+  }
+
+  public void setLastAgingSent(UUID userId, Instant when) {
+    if (userId == null || when == null) return;
+    redis.opsForValue().set(LAST_AGING_PREFIX + userId, when.toString());
   }
 
   public void saveIssue(IssueReport report) {

@@ -64,6 +64,35 @@ export async function listAssignedAssets(params: AssignedAssetsParams): Promise<
   return request<PageResponse<AssignedAsset>>(`${apiBase.asset}/assets/assigned?${qs.toString()}`);
 }
 
+export interface OwnerRef {
+  ownerType: OwnerType;
+  ownerId: string;
+}
+
+export interface BulkAssignedAssetsParams {
+  owners: OwnerRef[];
+  q?: string;
+  categoryCode?: string;
+  status?: AssetStatus;
+  page?: number;
+  size?: number;
+}
+
+export async function listAssignedAssetsBulk(params: BulkAssignedAssetsParams): Promise<PageResponse<AssignedAsset>> {
+  const qs = new URLSearchParams();
+  if (params.q) qs.set('q', params.q);
+  if (params.categoryCode) qs.set('categoryCode', params.categoryCode);
+  if (params.status) qs.set('status', params.status);
+  if (typeof params.page === 'number') qs.set('page', String(params.page));
+  if (typeof params.size === 'number') qs.set('size', String(params.size));
+
+  const url = `${apiBase.asset}/assets/assigned/bulk${qs.toString() ? `?${qs.toString()}` : ''}`;
+  return request<PageResponse<AssignedAsset>>(url, {
+    method: 'POST',
+    body: JSON.stringify({ owners: params.owners }),
+  });
+}
+
 export interface AgingParams {
   days?: number;
   q?: string;
@@ -266,6 +295,10 @@ export interface ActiveOwnerSummary {
 
 export async function getActiveOwnerSummary(): Promise<ActiveOwnerSummary[]> {
   return request<ActiveOwnerSummary[]>(`${apiBase.asset}/assets/assignments/active-summary`);
+}
+
+export async function getActiveAssignmentSummary(): Promise<AssetSummary> {
+  return request<AssetSummary>(`${apiBase.asset}/assets/assignments/active-asset-summary`);
 }
 
 export async function getAvailableSummary(status: AssetStatus = 'REGISTERED'): Promise<AssetAvailableSummary[]> {

@@ -42,6 +42,11 @@ telegram:
     enabled: ${TELEGRAM_CHECKS_ENABLED:true}
     period-days: ${TELEGRAM_CHECK_PERIOD_DAYS:30}
     cron: ${TELEGRAM_CHECK_CRON:0 0 9 * * *}
+  aging:
+    enabled: ${TELEGRAM_AGING_ENABLED:true}
+    days: ${TELEGRAM_AGING_DAYS:1095}
+    period-days: ${TELEGRAM_AGING_PERIOD_DAYS:30}
+    cron: ${TELEGRAM_AGING_CRON:0 15 9 * * *}
 
 management:
   endpoints:

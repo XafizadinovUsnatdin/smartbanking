@@ -135,7 +135,7 @@ export function EmployeeSignupRequestsPanel({ embedded = false, focusId = null }
       {!embedded && (
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-3xl font-bold text-gray-900">{t('page.signupRequests.title')}</h2>
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">{t('page.signupRequests.title')}</h2>
             <p className="text-gray-500 mt-1">{t('page.signupRequests.subtitle')}</p>
           </div>
         </div>

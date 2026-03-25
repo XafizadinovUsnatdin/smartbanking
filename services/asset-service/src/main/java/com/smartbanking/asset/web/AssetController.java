@@ -109,6 +109,50 @@ public class AssetController {
     return new PageResponse<>(items, page.getNumber(), page.getSize(), page.getTotalElements(), page.getTotalPages());
   }
 
+  public record OwnerRef(OwnerType ownerType, UUID ownerId) {}
+  public record BulkAssignedOwnersRequest(List<OwnerRef> owners) {}
+
+  @PostMapping("/assigned/bulk")
+  @PreAuthorize("hasAnyRole('ADMIN','IT_ADMIN','ASSET_MANAGER','AUDITOR')")
+  public PageResponse<AssignedAssetResponse> assignedToAnyOwners(
+      @RequestBody BulkAssignedOwnersRequest req,
+      @RequestParam Optional<String> q,
+      @RequestParam Optional<String> categoryCode,
+      @RequestParam Optional<AssetStatus> status,
+      @PageableDefault(size = 20) Pageable pageable
+  ) {
+    var owners = req == null ? null : req.owners();
+    var ownerRefs = owners == null
+        ? null
+        : owners.stream()
+            .filter(o -> o != null && o.ownerType() != null && o.ownerId() != null)
+            .map(o -> new AssetService.OwnerRef(o.ownerType(), o.ownerId()))
+            .toList();
+    var page = assetService.assignedToAnyOwners(
+        ownerRefs,
+        q,
+        categoryCode,
+        status,
+        pageable
+    );
+
+    if (page.getContent().isEmpty()) {
+      return new PageResponse<>(List.of(), page.getNumber(), page.getSize(), page.getTotalElements(), page.getTotalPages());
+    }
+
+    List<UUID> assetIds = page.getContent().stream().map(Asset::getId).toList();
+    Map<UUID, AssetAssignment> byAssetId = new HashMap<>();
+    for (AssetAssignment a : assetService.currentAssignments(assetIds)) {
+      if (a.getReturnedAt() != null) continue;
+      byAssetId.put(a.getAssetId(), a);
+    }
+
+    var items = page.getContent().stream()
+        .map(a -> new AssignedAssetResponse(a, byAssetId.get(a.getId()) == null ? null : toResponse(byAssetId.get(a.getId()))))
+        .toList();
+    return new PageResponse<>(items, page.getNumber(), page.getSize(), page.getTotalElements(), page.getTotalPages());
+  }
+
   @GetMapping("/{id}")
   public Asset get(@PathVariable UUID id) {
     return assetService.get(id);
@@ -173,6 +217,12 @@ public class AssetController {
     return assetService.activeOwnerSummary().stream()
         .map(s -> new ActiveOwnerSummaryResponse(s.ownerType(), s.ownerId(), s.count()))
         .toList();
+  }
+
+  @GetMapping("/assignments/active-asset-summary")
+  @PreAuthorize("hasAnyRole('ADMIN','IT_ADMIN','ASSET_MANAGER','AUDITOR')")
+  public AssetService.ActiveAssignmentSummary activeAssignmentSummary() {
+    return assetService.activeAssignmentSummary();
   }
 
   public record AvailableSummaryResponse(String categoryCode, String type, long count) {}

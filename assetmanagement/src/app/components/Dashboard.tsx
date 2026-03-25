@@ -13,7 +13,15 @@ import {
   XCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { getActiveOwnerSummary, getAssetSummary, listAgingAssets, listAssets, listCategories } from '../lib/api/assets';
+import {
+  getActiveAssignmentSummary,
+  getActiveOwnerSummary,
+  getAssetSummary,
+  listAgingAssets,
+  listAssets,
+  listCategories,
+  listCurrentAssignments,
+} from '../lib/api/assets';
 import { listDepartments, listUsers } from '../lib/api/identity';
 import type { AssetCategory, AssetStatus, Department, User as IdentityUser } from '../types';
 import { useI18n } from '../i18n/I18nProvider';
@@ -69,9 +77,18 @@ export function Dashboard() {
     WRITTEN_OFF: 0,
   });
   const [byCategory, setByCategory] = useState<Record<string, number>>({});
+  const [activeByStatus, setActiveByStatus] = useState<Record<AssetStatus, number>>({
+    REGISTERED: 0,
+    ASSIGNED: 0,
+    IN_REPAIR: 0,
+    LOST: 0,
+    WRITTEN_OFF: 0,
+  });
+  const [activeByCategory, setActiveByCategory] = useState<Record<string, number>>({});
   const [agingCount, setAgingCount] = useState(0);
   const [recentlyAdded, setRecentlyAdded] = useState(0);
   const [deptStats, setDeptStats] = useState<Array<{ departmentId: string; name: string; count: number }>>([]);
+  const [agingDeptStats, setAgingDeptStats] = useState<Array<{ departmentId: string; name: string; count: number }>>([]);
 
   const categoryByCode = useMemo(() => {
     const map: Record<string, AssetCategory> = {};
@@ -80,6 +97,7 @@ export function Dashboard() {
   }, [categories]);
 
   const totalAssets = useMemo(() => Object.values(byStatus).reduce((a, b) => a + b, 0), [byStatus]);
+  const activeTotalAssets = useMemo(() => Object.values(activeByStatus).reduce((a, b) => a + b, 0), [activeByStatus]);
 
   useEffect(() => {
     (async () => {
@@ -88,7 +106,7 @@ export function Dashboard() {
         const [summary, cats, aging, recent] = await Promise.all([
           getAssetSummary(),
           listCategories(),
-          listAgingAssets({ days: 1095, size: 1 }),
+          listAgingAssets({ days: 1095, size: 200 }),
           listAssets({ page: 0, size: 200, sort: 'createdAt,desc' }),
         ]);
 
@@ -111,6 +129,40 @@ export function Dashboard() {
 
         const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
         const recentCount = recent.items.filter((a) => new Date(a.createdAt).getTime() >= thirtyDaysAgo).length;
+
+        // Active assignments summary (status + category), best-effort.
+        try {
+          const active = await getActiveAssignmentSummary();
+
+          const sMap: Record<AssetStatus, number> = {
+            REGISTERED: 0,
+            ASSIGNED: 0,
+            IN_REPAIR: 0,
+            LOST: 0,
+            WRITTEN_OFF: 0,
+          };
+          active.byStatus.forEach((s) => {
+            const key = String(s.status) as AssetStatus;
+            if (key in sMap) sMap[key] = Number(s.count || 0);
+          });
+
+          const cMap: Record<string, number> = {};
+          active.byCategory.forEach((c) => {
+            cMap[String(c.categoryCode)] = Number(c.count || 0);
+          });
+
+          setActiveByStatus(sMap);
+          setActiveByCategory(cMap);
+        } catch {
+          setActiveByStatus({
+            REGISTERED: 0,
+            ASSIGNED: 0,
+            IN_REPAIR: 0,
+            LOST: 0,
+            WRITTEN_OFF: 0,
+          });
+          setActiveByCategory({});
+        }
 
         // Department statistics (active assignments), best-effort: do not fail the whole dashboard on 403/etc.
         try {
@@ -147,8 +199,38 @@ export function Dashboard() {
             }))
             .sort((a, b) => b.count - a.count);
           setDeptStats(stats);
+
+          const agingIds = (aging.items || []).map((a) => a.id);
+          if (agingIds.length === 0) {
+            setAgingDeptStats([]);
+          } else {
+            const assignments = await listCurrentAssignments(agingIds);
+            const agingDeptCounts: Record<string, number> = {};
+            assignments.forEach((a) => {
+              if (!a?.ownerType || !a?.ownerId) return;
+              if (a.ownerType === 'DEPARTMENT') {
+                const did = a.ownerId;
+                agingDeptCounts[did] = (agingDeptCounts[did] || 0) + 1;
+                return;
+              }
+              if (a.ownerType === 'EMPLOYEE') {
+                const did = userById[a.ownerId]?.departmentId || null;
+                if (!did) return;
+                agingDeptCounts[did] = (agingDeptCounts[did] || 0) + 1;
+              }
+            });
+            const aStats = Object.entries(agingDeptCounts)
+              .map(([departmentId, count]) => ({
+                departmentId,
+                name: deptById[departmentId]?.name || departmentId,
+                count,
+              }))
+              .sort((a, b) => b.count - a.count);
+            setAgingDeptStats(aStats);
+          }
         } catch {
           setDeptStats([]);
+          setAgingDeptStats([]);
         }
 
         setCategories(cats);
@@ -181,6 +263,16 @@ export function Dashboard() {
   const deptTop = deptStats.slice(0, 6);
   const deptMax = Math.max(1, ...deptTop.map((d) => d.count));
 
+  const agingDeptTop = agingDeptStats.slice(0, 6);
+  const agingDeptMax = Math.max(1, ...agingDeptTop.map((d) => d.count));
+
+  const activeCategoryTop = Object.entries(activeByCategory)
+    .filter(([_, count]) => Number(count || 0) > 0)
+    .map(([code, count]) => ({ code, name: categoryByCode[code]?.name || code, count: Number(count || 0) }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 6);
+  const activeCategoryMax = Math.max(1, ...activeCategoryTop.map((c) => c.count));
+
   const statCards = [
     { title: t('dashboard.stat.totalAssets'), value: totalAssets, icon: Package, iconBg: 'bg-blue-500', to: '/assets' },
     { title: t('dashboard.stat.assigned'), value: byStatus.ASSIGNED, icon: CheckCircle2, iconBg: 'bg-green-500', to: '/assets?status=ASSIGNED' },
@@ -211,7 +303,7 @@ export function Dashboard() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold text-gray-900">{t('page.dashboard.title')}</h2>
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">{t('page.dashboard.title')}</h2>
           <p className="text-gray-500 mt-1">{t('page.dashboard.subtitle')}</p>
         </div>
         <Link
@@ -322,6 +414,55 @@ export function Dashboard() {
           </div>
 
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <h3 className="font-semibold text-gray-900 text-sm mb-1">{t('dashboard.active.title')}</h3>
+            <p className="text-xs text-gray-500 mb-4">{t('dashboard.active.subtitle')}</p>
+
+            {activeTotalAssets <= 0 ? (
+              <p className="text-sm text-gray-500">{t('dashboard.active.empty')}</p>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-lg border border-gray-200 p-3">
+                    <div className="text-xs text-gray-500">{t('status.ASSIGNED')}</div>
+                    <div className="text-lg font-semibold text-gray-900">{activeByStatus.ASSIGNED}</div>
+                  </div>
+                  <div className="rounded-lg border border-gray-200 p-3">
+                    <div className="text-xs text-gray-500">{t('status.IN_REPAIR')}</div>
+                    <div className="text-lg font-semibold text-gray-900">{activeByStatus.IN_REPAIR}</div>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between gap-3 mb-2">
+                    <span className="text-xs font-medium text-gray-700">{t('dashboard.active.topCategories')}</span>
+                    <span className="text-xs text-gray-500">{t('common.count', { count: activeTotalAssets })}</span>
+                  </div>
+                  {activeCategoryTop.length === 0 ? (
+                    <p className="text-sm text-gray-500">{t('dashboard.active.empty')}</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {activeCategoryTop.map((c) => (
+                        <div key={c.code}>
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-xs font-medium text-gray-900 truncate">{c.name}</span>
+                            <span className="text-xs text-gray-500 whitespace-nowrap">{c.count}</span>
+                          </div>
+                          <div className="mt-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div
+                              className="h-2 bg-indigo-500 rounded-full"
+                              style={{ width: `${Math.round((c.count / activeCategoryMax) * 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <h3 className="font-semibold text-gray-900 text-sm mb-1">{t('dashboard.byDepartment.title')}</h3>
             <p className="text-xs text-gray-500 mb-4">{t('dashboard.byDepartment.subtitle')}</p>
             {deptTop.length === 0 ? (
@@ -346,12 +487,47 @@ export function Dashboard() {
             )}
           </div>
 
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="font-semibold text-gray-900 text-sm mb-1">{t('dashboard.agingByDepartment.title')}</h3>
+                <p className="text-xs text-gray-500">{t('dashboard.agingByDepartment.subtitle', { days: 1095 })}</p>
+              </div>
+              <Link to="/assets?aging=1&days=1095" className="text-xs text-blue-600 hover:text-blue-700 whitespace-nowrap">
+                {t('action.view')}
+              </Link>
+            </div>
+
+            <div className="mt-4">
+              {agingDeptTop.length === 0 ? (
+                <p className="text-sm text-gray-500">{t('dashboard.agingByDepartment.empty')}</p>
+              ) : (
+                <div className="space-y-3">
+                  {agingDeptTop.map((d) => (
+                    <div key={d.departmentId}>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-xs font-medium text-gray-900 truncate">{d.name}</span>
+                        <span className="text-xs text-gray-500 whitespace-nowrap">{d.count}</span>
+                      </div>
+                      <div className="mt-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-2 bg-orange-500 rounded-full"
+                          style={{ width: `${Math.round((d.count / agingDeptMax) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
           <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-5 text-white">
             <div className="flex items-center gap-2 mb-3">
               <Activity className="w-5 h-5 text-blue-200" />
               <h3 className="font-semibold text-sm">{t('dashboard.last30.title')}</h3>
             </div>
-            <p className="text-3xl font-bold mb-1">{loading ? t('common.none') : recentlyAdded}</p>
+            <p className="text-2xl sm:text-3xl font-bold mb-1">{loading ? t('common.none') : recentlyAdded}</p>
             <p className="text-blue-200 text-sm">{t('dashboard.last30.label')}</p>
             <div className="mt-4 pt-4 border-t border-blue-400/40">
               <Link
@@ -369,7 +545,7 @@ export function Dashboard() {
             <div className="space-y-2">
               {(Object.keys(byStatus) as AssetStatus[]).map((s) => (
                 <div key={s} className="flex items-center justify-between">
-                  <span className={`text-[11px] px-2 py-0.5 rounded ${getStatusBadgeStyle(s)}`}>{t(`status.${s}`)}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded ${getStatusBadgeStyle(s)}`}>{t(`status.${s}`)}</span>
                   <span className="text-xs font-semibold text-gray-700">
                     {loading ? t('common.none') : t('common.count', { count: byStatus[s] })}
                   </span>

@@ -159,7 +159,7 @@ export function QrPrintSheet() {
                   title={`${asset.name} (${asset.serialNumber})`}
                 >
                   <div className="text-center mb-2">
-                    <div className="text-[11px] font-semibold text-gray-900 truncate">{asset.name}</div>
+                    <div className="text-xs font-semibold text-gray-900 truncate">{asset.name}</div>
                     <div className="text-[10px] text-gray-600 truncate">{categoryName(asset.categoryCode)}</div>
                     <div className="text-[10px] font-mono text-gray-800 truncate">{asset.serialNumber}</div>
                   </div>

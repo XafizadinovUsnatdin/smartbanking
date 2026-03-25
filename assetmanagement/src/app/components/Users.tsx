@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { useI18n } from '../i18n/I18nProvider';
 import { useAuth } from './AuthProvider';
 import { bulkAssetQrTokens } from '../lib/api/qr';
-import { downloadAssetPhotoByUrl, getActiveOwnerSummary, listAssignedAssets, listCategories, listLatestPhotos } from '../lib/api/assets';
+import { downloadAssetPhotoByUrl, getActiveOwnerSummary, listAssignedAssetsBulk, listCategories, listLatestPhotos } from '../lib/api/assets';
 import { adminCreateUser, createBranch, createDepartment, listBranches, listDepartments, listUsers, updateDepartment, updateUser } from '../lib/api/identity';
 import type { AssetCategory, AssetStatus, AssignedAsset, Branch, Department, OwnerType, User } from '../types';
 import { formatDateTime, statusColors } from '../lib/utils';
@@ -137,44 +137,7 @@ export function Users() {
       return hay.includes(q);
     };
 
-    const userRow = (u: User): OwnerRow => {
-      const tg = u.telegramUsername
-        ? `@${String(u.telegramUsername).replace(/^@/, '')}`
-        : u.telegramUserId
-          ? `id:${u.telegramUserId}`
-          : null;
-      const subtitle = [u.username, u.jobTitle, u.phoneNumber, tg].filter(Boolean).join(' - ');
-      return {
-        ownerType: 'EMPLOYEE',
-        ownerId: u.id,
-        title: u.fullName || u.username || u.id,
-        subtitle: subtitle || null,
-        count: activeCounts[getKey('EMPLOYEE', u.id)] || 0,
-      };
-    };
-
-    const deptRow = (d: Department): OwnerRow => {
-      const tg = d.telegramUsername
-        ? `@${String(d.telegramUsername).replace(/^@/, '')}`
-        : d.telegramChatId
-          ? `id:${d.telegramChatId}`
-          : null;
-      return {
-        ownerType: 'DEPARTMENT',
-        ownerId: d.id,
-        title: d.name,
-        subtitle: [d.phoneNumber, tg].filter(Boolean).join(' - ') || null,
-        count: activeCounts[getKey('DEPARTMENT', d.id)] || 0,
-      };
-    };
-
-    const branchRow = (b: Branch): OwnerRow => ({
-      ownerType: 'BRANCH',
-      ownerId: b.id,
-      title: b.name,
-      subtitle: b.address || null,
-      count: activeCounts[getKey('BRANCH', b.id)] || 0,
-    });
+    const directCount = (ownerType: OwnerType, ownerId: string) => activeCounts[getKey(ownerType, ownerId)] || 0;
 
     const byName = (a?: string | null, b?: string | null) =>
       String(a || '').localeCompare(String(b || ''), undefined, { sensitivity: 'base' });
@@ -213,6 +176,70 @@ export function Users() {
         orphanUsers.push(u);
       }
     }
+
+    const employeeCountByDeptId: Record<string, number> = {};
+    for (const u of users) {
+      const did = u.departmentId || '';
+      if (!did) continue;
+      if (!deptById[did]) continue;
+      employeeCountByDeptId[did] = (employeeCountByDeptId[did] || 0) + directCount('EMPLOYEE', u.id);
+    }
+
+    const deptTotalCountById: Record<string, number> = {};
+    for (const d of departments) {
+      deptTotalCountById[d.id] = directCount('DEPARTMENT', d.id) + (employeeCountByDeptId[d.id] || 0);
+    }
+
+    const branchTotalCountById: Record<string, number> = {};
+    for (const b of branches) {
+      let total = directCount('BRANCH', b.id);
+      for (const d of deptsByBranchId[b.id] || []) {
+        total += deptTotalCountById[d.id] || 0;
+      }
+      for (const u of usersByBranchNoDept[b.id] || []) {
+        total += directCount('EMPLOYEE', u.id);
+      }
+      branchTotalCountById[b.id] = total;
+    }
+
+    const userRow = (u: User): OwnerRow => {
+      const tg = u.telegramUsername
+        ? `@${String(u.telegramUsername).replace(/^@/, '')}`
+        : u.telegramUserId
+          ? `id:${u.telegramUserId}`
+          : null;
+      const subtitle = [u.username, u.jobTitle, u.phoneNumber, tg].filter(Boolean).join(' - ');
+      return {
+        ownerType: 'EMPLOYEE',
+        ownerId: u.id,
+        title: u.fullName || u.username || u.id,
+        subtitle: subtitle || null,
+        count: directCount('EMPLOYEE', u.id),
+      };
+    };
+
+    const deptRow = (d: Department): OwnerRow => {
+      const tg = d.telegramUsername
+        ? `@${String(d.telegramUsername).replace(/^@/, '')}`
+        : d.telegramChatId
+          ? `id:${d.telegramChatId}`
+          : null;
+      return {
+        ownerType: 'DEPARTMENT',
+        ownerId: d.id,
+        title: d.name,
+        subtitle: [d.phoneNumber, tg].filter(Boolean).join(' - ') || null,
+        count: deptTotalCountById[d.id] || 0,
+      };
+    };
+
+    const branchRow = (b: Branch): OwnerRow => ({
+      ownerType: 'BRANCH',
+      ownerId: b.id,
+      title: b.name,
+      subtitle: b.address || null,
+      count: branchTotalCountById[b.id] || 0,
+    });
 
     const out: OwnerTreeRow[] = [];
 
@@ -503,6 +530,37 @@ export function Users() {
   const [assetTotalItems, setAssetTotalItems] = useState(0);
   const [assigned, setAssigned] = useState<AssignedAsset[]>([]);
 
+  const employeeIdsByDeptId = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    for (const u of users) {
+      const did = u.departmentId || '';
+      if (!did) continue;
+      (map[did] ||= []).push(u.id);
+    }
+    return map;
+  }, [users]);
+
+  const employeeIdsNoDeptByBranchId = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    for (const u of users) {
+      if (u.departmentId) continue;
+      const bid = u.branchId || '';
+      if (!bid) continue;
+      (map[bid] ||= []).push(u.id);
+    }
+    return map;
+  }, [users]);
+
+  const deptIdsByBranchId = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    for (const d of departments) {
+      const bid = d.branchId || '';
+      if (!bid) continue;
+      (map[bid] ||= []).push(d.id);
+    }
+    return map;
+  }, [departments]);
+
   const [qrPayloadByAssetId, setQrPayloadByAssetId] = useState<Record<string, string>>({});
   const [latestPhotoByAssetId, setLatestPhotoByAssetId] = useState<Record<string, string>>({});
   const [thumbUrls, setThumbUrls] = useState<Record<string, string>>({});
@@ -538,9 +596,30 @@ export function Users() {
       if (!selected) return;
       setAssetLoading(true);
       try {
-        const resp = await listAssignedAssets({
-          ownerType: selected.ownerType,
-          ownerId: selected.ownerId,
+        const owners: Array<{ ownerType: OwnerType; ownerId: string }> = [];
+        const seen = new Set<string>();
+        const push = (ownerType: OwnerType, ownerId: string) => {
+          const key = `${ownerType}::${ownerId}`;
+          if (seen.has(key)) return;
+          seen.add(key);
+          owners.push({ ownerType, ownerId });
+        };
+
+        if (selected.ownerType === 'EMPLOYEE') {
+          push('EMPLOYEE', selected.ownerId);
+        } else if (selected.ownerType === 'DEPARTMENT') {
+          push('DEPARTMENT', selected.ownerId);
+          (employeeIdsByDeptId[selected.ownerId] || []).forEach((id) => push('EMPLOYEE', id));
+        } else if (selected.ownerType === 'BRANCH') {
+          push('BRANCH', selected.ownerId);
+          const deptIds = deptIdsByBranchId[selected.ownerId] || [];
+          deptIds.forEach((id) => push('DEPARTMENT', id));
+          deptIds.forEach((did) => (employeeIdsByDeptId[did] || []).forEach((uid) => push('EMPLOYEE', uid)));
+          (employeeIdsNoDeptByBranchId[selected.ownerId] || []).forEach((id) => push('EMPLOYEE', id));
+        }
+
+        const resp = await listAssignedAssetsBulk({
+          owners,
           q: assetDebouncedQuery ? assetDebouncedQuery : undefined,
           status: assetStatus === 'ALL' ? undefined : assetStatus,
           categoryCode: assetCategory === 'ALL' ? undefined : assetCategory,
@@ -584,7 +663,17 @@ export function Users() {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected?.ownerId, selected?.ownerType, assetDebouncedQuery, assetStatus, assetCategory, assetPage]);
+  }, [
+    selected?.ownerId,
+    selected?.ownerType,
+    assetDebouncedQuery,
+    assetStatus,
+    assetCategory,
+    assetPage,
+    employeeIdsByDeptId,
+    employeeIdsNoDeptByBranchId,
+    deptIdsByBranchId,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -646,7 +735,7 @@ export function Users() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-gray-900">{t('page.users.title')}</h2>
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">{t('page.users.title')}</h2>
           <p className="text-gray-500 mt-1">{t('page.users.subtitle')}</p>
         </div>
         <div className="flex items-center gap-2">

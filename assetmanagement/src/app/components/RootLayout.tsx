@@ -209,7 +209,7 @@ export function RootLayout() {
                   >
                     <Bell className="w-5 h-5 text-gray-700" />
                     {pendingRequests > 0 && (
-                      <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-red-600 text-white text-[11px] leading-5 text-center font-semibold shadow-sm">
+                      <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-red-600 text-white text-xs leading-5 text-center font-semibold shadow-sm">
                         {pendingRequests > 99 ? '99+' : pendingRequests}
                       </span>
                     )}
@@ -261,7 +261,7 @@ export function RootLayout() {
               <p className="text-sm font-medium text-gray-900">{user?.username || 'User'}</p>
               <p className="text-xs text-gray-400">{(user?.roles || []).join(', ') || 'Authenticated'}</p>
               {isAdmin && (serverTime || lastLoginAt) && (
-                <p className="text-[11px] text-gray-400 mt-0.5 leading-tight">
+                <p className="text-xs text-gray-400 mt-0.5 leading-tight">
                   {serverTime ? `${t('header.serverTime')}: ${formatDateTime(serverTime)}` : null}
                   {serverTime && lastLoginAt ? ' • ' : null}
                   {lastLoginAt ? `${t('header.lastLogin')}: ${formatDateTime(lastLoginAt)}` : null}
