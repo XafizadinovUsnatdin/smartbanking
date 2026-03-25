@@ -77,7 +77,9 @@ async function doFetch<T>(
   }
 
   const res = await fetch(url, { ...options, headers });
-  if (res.status === 401 && retryOn401 && getRefreshToken()) {
+  // Some backend services respond with 403 (instead of 401) when the JWT is missing/expired.
+  // Treat both as an auth failure and try a refresh once.
+  if ((res.status === 401 || res.status === 403) && retryOn401 && getRefreshToken()) {
     try {
       if (!refreshInFlight) {
         refreshInFlight = refreshTokens().finally(() => {
