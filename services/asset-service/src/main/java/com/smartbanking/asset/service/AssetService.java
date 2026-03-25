@@ -482,6 +482,18 @@ public class AssetService {
         .toList();
   }
 
+  public List<ActiveOwnerSummary> activeAgingOwnerSummary(int olderThanDays) {
+    if (olderThanDays < 0) {
+      throw new BadRequestException("days must be >= 0");
+    }
+    LocalDate thresholdDate = LocalDate.now().minusDays(olderThanDays);
+    Instant thresholdInstant = Instant.now().minus(olderThanDays, ChronoUnit.DAYS);
+    return assignmentRepo.countActiveAgingByOwner(thresholdDate, thresholdInstant)
+        .stream()
+        .map(c -> new ActiveOwnerSummary(c.getOwnerType(), c.getOwnerId(), c.getCount()))
+        .toList();
+  }
+
   public record AvailableSummary(String categoryCode, String type, long count) {}
 
   public List<AvailableSummary> availableSummary(AssetStatus status) {

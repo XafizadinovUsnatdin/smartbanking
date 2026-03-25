@@ -297,6 +297,12 @@ export async function getActiveOwnerSummary(): Promise<ActiveOwnerSummary[]> {
   return request<ActiveOwnerSummary[]>(`${apiBase.asset}/assets/assignments/active-summary`);
 }
 
+export async function getAgingOwnerSummary(days: number = 1095): Promise<ActiveOwnerSummary[]> {
+  const qs = new URLSearchParams();
+  qs.set('days', String(days));
+  return request<ActiveOwnerSummary[]>(`${apiBase.asset}/assets/assignments/aging-summary?${qs.toString()}`);
+}
+
 export async function getActiveAssignmentSummary(): Promise<AssetSummary> {
   return request<AssetSummary>(`${apiBase.asset}/assets/assignments/active-asset-summary`);
 }

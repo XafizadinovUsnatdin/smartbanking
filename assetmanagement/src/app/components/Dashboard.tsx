@@ -16,11 +16,11 @@ import { toast } from 'sonner';
 import {
   getActiveAssignmentSummary,
   getActiveOwnerSummary,
+  getAgingOwnerSummary,
   getAssetSummary,
   listAgingAssets,
   listAssets,
   listCategories,
-  listCurrentAssignments,
 } from '../lib/api/assets';
 import { listDepartments, listUsers } from '../lib/api/identity';
 import type { AssetCategory, AssetStatus, Department, User as IdentityUser } from '../types';
@@ -106,7 +106,7 @@ export function Dashboard() {
         const [summary, cats, aging, recent] = await Promise.all([
           getAssetSummary(),
           listCategories(),
-          listAgingAssets({ days: 1095, size: 200 }),
+          listAgingAssets({ days: 1095, size: 1 }),
           listAssets({ page: 0, size: 200, sort: 'createdAt,desc' }),
         ]);
 
@@ -166,8 +166,9 @@ export function Dashboard() {
 
         // Department statistics (active assignments), best-effort: do not fail the whole dashboard on 403/etc.
         try {
-          const [activeOwners, departments, users] = await Promise.all([
+          const [activeOwners, agingOwners, departments, users] = await Promise.all([
             getActiveOwnerSummary(),
+            getAgingOwnerSummary(1095),
             listDepartments(),
             listUsers(),
           ]);
@@ -200,34 +201,30 @@ export function Dashboard() {
             .sort((a, b) => b.count - a.count);
           setDeptStats(stats);
 
-          const agingIds = (aging.items || []).map((a) => a.id);
-          if (agingIds.length === 0) {
-            setAgingDeptStats([]);
-          } else {
-            const assignments = await listCurrentAssignments(agingIds);
-            const agingDeptCounts: Record<string, number> = {};
-            assignments.forEach((a) => {
-              if (!a?.ownerType || !a?.ownerId) return;
-              if (a.ownerType === 'DEPARTMENT') {
-                const did = a.ownerId;
-                agingDeptCounts[did] = (agingDeptCounts[did] || 0) + 1;
-                return;
-              }
-              if (a.ownerType === 'EMPLOYEE') {
-                const did = userById[a.ownerId]?.departmentId || null;
-                if (!did) return;
-                agingDeptCounts[did] = (agingDeptCounts[did] || 0) + 1;
-              }
-            });
-            const aStats = Object.entries(agingDeptCounts)
-              .map(([departmentId, count]) => ({
-                departmentId,
-                name: deptById[departmentId]?.name || departmentId,
-                count,
-              }))
-              .sort((a, b) => b.count - a.count);
-            setAgingDeptStats(aStats);
-          }
+          const agingDeptCounts: Record<string, number> = {};
+          agingOwners.forEach((s) => {
+            if (!s?.ownerId) return;
+            const cnt = Number(s.count || 0);
+            if (cnt <= 0) return;
+
+            if (s.ownerType === 'DEPARTMENT') {
+              agingDeptCounts[s.ownerId] = (agingDeptCounts[s.ownerId] || 0) + cnt;
+              return;
+            }
+            if (s.ownerType === 'EMPLOYEE') {
+              const did = userById[s.ownerId]?.departmentId || null;
+              if (!did) return;
+              agingDeptCounts[did] = (agingDeptCounts[did] || 0) + cnt;
+            }
+          });
+          const aStats = Object.entries(agingDeptCounts)
+            .map(([departmentId, count]) => ({
+              departmentId,
+              name: deptById[departmentId]?.name || departmentId,
+              count,
+            }))
+            .sort((a, b) => b.count - a.count);
+          setAgingDeptStats(aStats);
         } catch {
           setDeptStats([]);
           setAgingDeptStats([]);

@@ -219,6 +219,14 @@ public class AssetController {
         .toList();
   }
 
+  @GetMapping("/assignments/aging-summary")
+  @PreAuthorize("hasAnyRole('ADMIN','IT_ADMIN','ASSET_MANAGER','AUDITOR')")
+  public List<ActiveOwnerSummaryResponse> agingOwnerSummary(@RequestParam(defaultValue = "1095") int days) {
+    return assetService.activeAgingOwnerSummary(days).stream()
+        .map(s -> new ActiveOwnerSummaryResponse(s.ownerType(), s.ownerId(), s.count()))
+        .toList();
+  }
+
   @GetMapping("/assignments/active-asset-summary")
   @PreAuthorize("hasAnyRole('ADMIN','IT_ADMIN','ASSET_MANAGER','AUDITOR')")
   public AssetService.ActiveAssignmentSummary activeAssignmentSummary() {
