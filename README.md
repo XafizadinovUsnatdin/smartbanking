@@ -84,30 +84,6 @@ Docker Desktop odatda Linux disk image'ini **C:** ga saqlaydi (image build payti
 - Tezkor tozalash (xavfsiz): `docker builder prune -af`
 - Disk image'ni **D:** ga ko'chirish: Docker Desktop -> Settings -> Resources -> Advanced -> Disk image location -> `D:\...` -> Apply & Restart
 
-## Lokal backend'ni internetga chiqarish (Cloudflare quick tunnel)
-
-Agar frontend deploy qilingan bo'lsa (masalan, Vercel) va laptop yoqilgan paytda lokal backend'ni global ko'rinadigan qilish kerak bo'lsa:
-
-1. Backend + tunnel'ni ishga tushiring:
-   - `docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up -d --build`
-   - Yoki: `bash scripts/compose-tunnel.sh quick up -d --build`
-2. Public URL'ni o'qing:
-   - `docker compose -f docker-compose.yml -f docker-compose.tunnel.yml logs -f cloudflared`
-   - `https://<something>.trycloudflare.com` ko'rinishidagi URL chiqadi
-3. Frontend env'larini yangilang (Asset UI):
-   - `VITE_IDENTITY_API=https://<tunnel>/identity`
-   - `VITE_ASSET_API=https://<tunnel>/asset`
-   - `VITE_AUDIT_API=https://<tunnel>`
-   - `VITE_QR_API=https://<tunnel>`
-   - `VITE_ANALYTICS_API=https://<tunnel>`
-4. Backend CORS'ni ham moslang (docker compose uchun lokal `.env`):
-   - `CORS_ALLOWED_ORIGINS=https://<frontend-domain>,http://localhost:5173`
-
-Eslatma: quick tunnel URL'lari `cloudflared` to'xtatilsa/ishga tushirilsa o'zgarishi mumkin. Barqaror URL uchun domen bilan Cloudflare Tunnel ishlating.
-
-## Barqaror domen (Cloudflare Tunnel + domeningiz)
-
-Agar domen sotib olgan bo'lsangiz va `https://api.<domen>` kabi barqaror backend URL kerak bo'lsa, "named tunnel" ishlating.
 
 1. Cloudflare Zero Trust'da tunnel yarating va token oling.
 2. Tunnel ichida Public Hostname qo'shing:
