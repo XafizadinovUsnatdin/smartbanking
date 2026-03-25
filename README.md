@@ -1,124 +1,119 @@
 # SmartBanking / Smart Office Platform
 
-Microservice-based platform (Java 17 + Spring Boot + PostgreSQL + Kafka + Redis) focused on **bank office asset management** (lifecycle, assignment, QR, audit, analytics).
+Bank ofisi uchun **aktivlarni boshqarish** platformasi: aktiv hayotiy sikli, biriktirish, QR, audit va analitika.
 
-## Project layout (split)
+Texnologiyalar: Java 17, Spring Boot, PostgreSQL, Kafka, Redis, Vite.
 
-- Backend (microservices + infra): `services/`, `shared/`, `infra/`, `docker-compose.yml`
+## Loyihaning tuzilishi
+
+- Backend (mikroservislar + infra): `services/`, `shared/`, `infra/`, `docker-compose.yml`
 - Frontend (admin UI): `assetmanagement/`
 
-## Backend quick start (Docker)
+## Tezkor ishga tushirish (Docker)
 
-1. Start infrastructure + services:
+Talablar: Docker Desktop.
+
+1. Servislarni ishga tushiring:
    - `docker compose up --build -d`
-   - If `docker` is not recognized in PowerShell:
+   - Agar PowerShell'da `docker` topilmasa:
      - `& 'C:\Program Files\Docker\Docker\resources\bin\docker.exe' compose up --build -d`
-2. Login (first admin is auto-created on first start):
-   - 
-   - Configure via `.env`: `BOOTSTRAP_ADMIN_USERNAME`, `BOOTSTRAP_ADMIN_PASSWORD`, `BOOTSTRAP_ADMIN_FULL_NAME`
 
-### Forgot admin password (no DB reset)
-If DB already has users and you forgot the admin password:
-1. Set `.env`: `BOOTSTRAP_ADMIN_RESET=true` + new `BOOTSTRAP_ADMIN_PASSWORD`
-2. Restart identity-service: `docker compose restart identity-service`
-3. Login, then set `BOOTSTRAP_ADMIN_RESET=false` again.
+Eslatma: maxfiy sozlamalar (token/parol/kalitlar) uchun lokal `.env` ishlatiladi - ularni Git'ga qo'shmang.
 
-## API docs (Swagger / OpenAPI)
+## API hujjatlari (Swagger / OpenAPI)
 
-Open in browser:
+Brauzerda oching:
 - Identity: `http://localhost:8081/swagger-ui/index.html` (OpenAPI JSON: `http://localhost:8081/v3/api-docs`)
 - Asset: `http://localhost:8082/swagger-ui/index.html` (OpenAPI JSON: `http://localhost:8082/v3/api-docs`)
 - Audit: `http://localhost:8083/swagger-ui/index.html` (OpenAPI JSON: `http://localhost:8083/v3/api-docs`)
 - QR: `http://localhost:8084/swagger-ui/index.html` (OpenAPI JSON: `http://localhost:8084/v3/api-docs`)
 - Analytics: `http://localhost:8085/swagger-ui/index.html` (OpenAPI JSON: `http://localhost:8085/v3/api-docs`)
 
-## Frontend quick start (Node.js)
+## Frontend (Admin UI) - tezkor ishga tushirish
 
-1. Start UI:
+Talablar: Node.js.
+
+1. UI'ni ishga tushiring:
    - `cd assetmanagement`
-   - `copy .env.example .env` (Windows) or `cp .env.example .env`
+   - `copy .env.example .env` (Windows) yoki `cp .env.example .env`
    - `npm install`
    - `npm run dev`
-2. Open UI:
+2. UI manzili:
    - `http://localhost:5173/login`
-   - Login: 
 
-## Deployment (Vercel / Cloudflare / Railway)
+## Deploy (Vercel / Cloudflare / Railway)
 
-- See `docs/deployment.md`
+- `docs/deployment.md` ga qarang.
 
 ## Smoke test
 
 - `powershell -ExecutionPolicy Bypass -File scripts/smoke-test.ps1`
 
-## Telegram bot (Smart_Bankingbot)
+## Telegram bot
 
-This repo includes a Telegram bot integration (`telegram-service`) for:
-- assignment notifications (on `AssetAssigned` Kafka event)
-- periodic "are your devices working?" checks (default: every 30 days)
-- employee asset requests via bot (`/request`)
-- admin approval flow for "not working" reports
-- new employee signup requests (shown in the admin UI: `Employee requests`)
+Bu repoda Telegram bot integratsiyasi (`telegram-service`) bor:
+- aktiv biriktirilganda xabarnoma (`AssetAssigned` Kafka hodisasi)
+- davriy "qurilmalar ishlayaptimi?" tekshiruvi
+- xodimlar uchun aktiv so'rovi (`/request`)
+- "ishlamayapti" xabarlari uchun admin tasdiqlash oqimi
+- yangi xodim ro'yxatdan o'tish so'rovlari (admin UI'da: `Employee requests`)
 
-Setup (do **not** commit the token):
-
-1. Create a root `.env` file and set:
-   - `TELEGRAM_BOT_TOKEN=...`
-2. Start the bot service:
+Sozlash:
+1. Root `.env` ga bot tokenini kiriting (env: `TELEGRAM_BOT_TOKEN`). Tokenni Git'ga qo'shmang.
+2. Bot servisini ishga tushiring:
    - `docker compose up --build -d telegram-service`
-   - If `docker` is not recognized in PowerShell:
+   - Agar PowerShell'da `docker` topilmasa:
      - `& 'C:\Program Files\Docker\Docker\resources\bin\docker.exe' compose up --build -d telegram-service`
-3. Link an account:
-   - When assigning an asset to an EMPLOYEE in the UI, fill `Phone number` + `Telegram username or ID`.
-   - The employee must open the bot and press `/start` once (Telegram does not allow bots to message users before that).
+3. Hisobni bog'lash:
+   - UI'da aktivni EMPLOYEEga biriktirganda `Phone number` va `Telegram username or ID` maydonlarini to'ldiring.
+   - Xodim botni ochib kamida bir marta `/start` bosishi kerak (Telegram qoidasi).
 
-Config (optional):
-- `TELEGRAM_CHECK_PERIOD_DAYS` (default `30`)
-- `TELEGRAM_CHECK_CRON` (default daily at `09:00`, and the service enforces `PERIOD_DAYS` per user)
+Qo'shimcha sozlamalar:
+- `TELEGRAM_CHECK_PERIOD_DAYS`
+- `TELEGRAM_CHECK_CRON`
 
-## Notes
+## Eslatmalar
 
-- QR scanner page uses camera (works on `http://localhost`, other hosts may require HTTPS for camera permissions).
-- A4 QR print is available from the Assets page (opens a print-friendly tab).
+- QR skaner sahifasi kamera ishlatadi (`http://localhost` da ishlaydi; boshqa hostlarda kamera uchun HTTPS talab qilinishi mumkin).
+- Aktivlar sahifasidan A4 formatdagi QR print mavjud (print-friendly tab ochiladi).
 
-## Disk space (Windows / Docker Desktop)
+## Disk maydoni (Windows / Docker Desktop)
 
-Docker Desktop stores its Linux disk image on **C:** by default (this can grow when building images).
+Docker Desktop odatda Linux disk image'ini **C:** ga saqlaydi (image build paytida hajm oshishi mumkin).
 
-- Quick cleanup (safe): `docker builder prune -af`
-- Move Docker disk image to **D:**: Docker Desktop -> Settings -> Resources -> Advanced -> Disk image location -> choose a folder on `D:\` -> Apply & Restart
+- Tezkor tozalash (xavfsiz): `docker builder prune -af`
+- Disk image'ni **D:** ga ko'chirish: Docker Desktop -> Settings -> Resources -> Advanced -> Disk image location -> `D:\...` -> Apply & Restart
 
-## Expose your laptop backend to the internet (Cloudflare quick tunnel)
+## Lokal backend'ni internetga chiqarish (Cloudflare quick tunnel)
 
-If your frontend is deployed (e.g. Vercel) and you want to make your **local** backend reachable globally **while your laptop is ON**, you can use a Cloudflare quick tunnel:
+Agar frontend deploy qilingan bo'lsa (masalan, Vercel) va laptop yoqilgan paytda lokal backend'ni global ko'rinadigan qilish kerak bo'lsa:
 
-1. Start backend + tunnel:
+1. Backend + tunnel'ni ishga tushiring:
    - `docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up -d --build`
-   - Or: `bash scripts/compose-tunnel.sh quick up -d --build`
-2. Read the public URL:
+   - Yoki: `bash scripts/compose-tunnel.sh quick up -d --build`
+2. Public URL'ni o'qing:
    - `docker compose -f docker-compose.yml -f docker-compose.tunnel.yml logs -f cloudflared`
-   - Look for a `https://<something>.trycloudflare.com` URL
-3. Set Vercel env vars (Asset UI project):
+   - `https://<something>.trycloudflare.com` ko'rinishidagi URL chiqadi
+3. Frontend env'larini yangilang (Asset UI):
    - `VITE_IDENTITY_API=https://<tunnel>/identity`
    - `VITE_ASSET_API=https://<tunnel>/asset`
    - `VITE_AUDIT_API=https://<tunnel>`
    - `VITE_QR_API=https://<tunnel>`
    - `VITE_ANALYTICS_API=https://<tunnel>`
-4. Also update backend CORS (local `.env` used by docker compose):
-   - `CORS_ALLOWED_ORIGINS=https://assettracing.vercel.app,http://localhost:5173`
+4. Backend CORS'ni ham moslang (docker compose uchun lokal `.env`):
+   - `CORS_ALLOWED_ORIGINS=https://<frontend-domain>,http://localhost:5173`
 
-Note: the quick tunnel URL can change if you stop/restart `cloudflared`. For a stable URL, use a real domain with Cloudflare Tunnel.
+Eslatma: quick tunnel URL'lari `cloudflared` to'xtatilsa/ishga tushirilsa o'zgarishi mumkin. Barqaror URL uchun domen bilan Cloudflare Tunnel ishlating.
 
-## Stable domain (Cloudflare Tunnel + your domain)
+## Barqaror domen (Cloudflare Tunnel + domeningiz)
 
-If you bought a domain (e.g. `tahlilchi.uz`) and want a **stable** backend URL like `https://api.tahlilchi.uz`, use a named tunnel token:
+Agar domen sotib olgan bo'lsangiz va `https://api.<domen>` kabi barqaror backend URL kerak bo'lsa, "named tunnel" ishlating.
 
-1. Cloudflare -> Zero Trust -> Networks -> Tunnels -> Create tunnel (Cloudflared) -> copy the **token**.
-2. Add a Public Hostname in the same tunnel:
+1. Cloudflare Zero Trust'da tunnel yarating va token oling.
+2. Tunnel ichida Public Hostname qo'shing:
    - Hostname: `api.<your-domain>`
-   - Service: `http://localhost:18080` (this repo's `api-gateway`)
-3. Put the token into your local `.env` (do **not** commit it):
-   - `CLOUDFLARED_TOKEN=...`
-4. Start backend + tunnel:
+   - Service: `http://localhost:18080` (bu repodagi `api-gateway`)
+3. Tokenni lokal `.env` ga kiriting (env: `CLOUDFLARED_TOKEN`) va Git'ga qo'shmang.
+4. Backend + tunnel'ni ishga tushiring:
    - `docker compose -f docker-compose.yml -f docker-compose.tunnel.yml -f docker-compose.cloudflare.yml up -d --build`
-   - Or: `bash scripts/compose-tunnel.sh named up -d --build`
+   - Yoki: `bash scripts/compose-tunnel.sh named up -d --build`
