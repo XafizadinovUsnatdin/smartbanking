@@ -90,11 +90,29 @@ try {
 
   $headers = @{ Authorization = "Bearer $access" }
 
+  # Create branch + department for EMPLOYEE constraints (EMPLOYEE must belong to a department).
+  $branchBody = @{
+    name = "Smoke Branch " + ([guid]::NewGuid().ToString().Substring(0, 8))
+    address = "Smoke address"
+  } | ConvertTo-Json
+  $branch = Invoke-RestMethod -Method Post -Uri "http://localhost:8081/branches" -ContentType "application/json" -Headers $headers -Body $branchBody
+  $branchId = $branch.id
+  Write-Host "Branch created: $branchId"
+
+  $deptBody = @{
+    name = "Smoke Department " + ([guid]::NewGuid().ToString().Substring(0, 8))
+    branchId = $branchId
+  } | ConvertTo-Json
+  $dept = Invoke-RestMethod -Method Post -Uri "http://localhost:8081/departments" -ContentType "application/json" -Headers $headers -Body $deptBody
+  $departmentId = $dept.id
+  Write-Host "Department created: $departmentId"
+
   # Create a dedicated EMPLOYEE owner for this run to keep inventory expectations isolated
   $empUser = @{
     username = "emp_" + ([guid]::NewGuid().ToString().Substring(0, 8))
     password = "User1234!"
     fullName = "Smoke Employee"
+    departmentId = $departmentId
     roles = @("EMPLOYEE")
   } | ConvertTo-Json
   $emp = Invoke-RestMethod -Method Post -Uri "http://localhost:8081/auth/admin/create-user" -ContentType "application/json" -Headers $headers -Body $empUser

@@ -30,6 +30,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.beans.factory.annotation.Value;
 
 @Component
 public class TelegramBotHandler {
@@ -41,13 +42,22 @@ public class TelegramBotHandler {
   private final AssetClient assets;
   private final ServiceAuth auth;
   private final BotStateRepository state;
+  private final UUID defaultEmployeeDepartmentId;
 
-  public TelegramBotHandler(TelegramClient telegram, IdentityClient identity, AssetClient assets, ServiceAuth auth, BotStateRepository state) {
+  public TelegramBotHandler(
+      TelegramClient telegram,
+      IdentityClient identity,
+      AssetClient assets,
+      ServiceAuth auth,
+      BotStateRepository state,
+      @Value("${telegram.default-employee-department-id:}") String defaultEmployeeDepartmentId
+  ) {
     this.telegram = telegram;
     this.identity = identity;
     this.assets = assets;
     this.auth = auth;
     this.state = state;
+    this.defaultEmployeeDepartmentId = parseUuidOrNull(defaultEmployeeDepartmentId);
   }
 
   public void handle(Update update) {
@@ -416,6 +426,12 @@ public class TelegramBotHandler {
       return;
     }
 
+    if (defaultEmployeeDepartmentId == null) {
+      telegram.answerCallbackQuery(cb.id(), "Bo'lim kerak");
+      telegram.sendMessage(chatId, "Xodim yaratish uchun bo'lim (departmentId) kerak.\nAdmin paneldan xodimni qo'shing yoki `telegram.default-employee-department-id` ni sozlang.");
+      return;
+    }
+
     String adminToken = auth.asUserToken(admin.id(), admin.username(), admin.roles());
     String baseUsername = req.telegramUsername();
     if (baseUsername == null || baseUsername.isBlank()) {
@@ -437,7 +453,7 @@ public class TelegramBotHandler {
         req.telegramUserId(),
         req.chatId(),
         req.jobTitle(),
-        null,
+        defaultEmployeeDepartmentId,
         null,
         Set.of("EMPLOYEE")
     );
@@ -457,7 +473,7 @@ public class TelegramBotHandler {
           req.telegramUserId(),
           req.chatId(),
           req.jobTitle(),
-          null,
+          defaultEmployeeDepartmentId,
           null,
           Set.of("EMPLOYEE")
       );
@@ -1043,6 +1059,11 @@ public class TelegramBotHandler {
     } catch (Exception ignored) {
       return null;
     }
+  }
+
+  private static UUID parseUuidOrNull(String raw) {
+    if (raw == null || raw.isBlank()) return null;
+    return parseUuid(raw);
   }
 
   private static String safe(String s) {

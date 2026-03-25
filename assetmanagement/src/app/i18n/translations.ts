@@ -64,6 +64,15 @@ export const translations: Record<Lang, Record<string, string>> = {
     'user.field.fullName': "F.I.Sh",
     'user.field.jobTitle': 'Lavozim',
     'department.field.branch': 'Filial',
+    'department.field': "Bo'lim",
+
+    'user.departmentRequired': "Xodim uchun bo'lim tanlash shart",
+
+    'branch.field.address': 'Manzil',
+
+    'users.action.addBranch': "Filial qo'shish",
+    'users.action.addDepartment': "Bo'lim qo'shish",
+    'users.action.addEmployee': "Xodim qo'shish",
 
     'page.dashboard.title': 'Bosh sahifa',
     'page.dashboard.subtitle': "Aktivlar bo'yicha umumiy statistika",
@@ -112,6 +121,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     'login.title': 'Kirish',
     'login.username': 'Username',
     'login.password': 'Parol',
+    'login.passwordMin': "Parol kamida 8 ta belgidan iborat bo'lishi kerak",
     'login.passwordShow': 'Parolni ko‘rsatish',
     'login.passwordHide': 'Parolni yashirish',
     'login.submit': 'Kirish',
@@ -486,6 +496,15 @@ export const translations: Record<Lang, Record<string, string>> = {
     'user.field.fullName': 'Full name',
     'user.field.jobTitle': 'Job title',
     'department.field.branch': 'Branch',
+    'department.field': 'Department',
+
+    'user.departmentRequired': 'Department is required for employees',
+
+    'branch.field.address': 'Address',
+
+    'users.action.addBranch': 'Add branch',
+    'users.action.addDepartment': 'Add department',
+    'users.action.addEmployee': 'Add employee',
 
     'page.dashboard.title': 'Dashboard',
     'page.dashboard.subtitle': 'Overall asset statistics',
@@ -534,6 +553,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     'login.title': 'Sign in',
     'login.username': 'Username',
     'login.password': 'Password',
+    'login.passwordMin': 'Password must be at least 8 characters',
     'login.passwordShow': 'Show password',
     'login.passwordHide': 'Hide password',
     'login.submit': 'Sign in',

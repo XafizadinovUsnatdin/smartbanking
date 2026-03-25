@@ -6,6 +6,7 @@ import com.smartbanking.asset.service.AssetPhotoStorage;
 import com.smartbanking.asset.service.AssetService;
 import com.smartbanking.asset.web.dto.AssetPhotoResponse;
 import java.nio.file.Files;
+import java.net.URLConnection;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -48,7 +49,7 @@ public class AssetPhotoController {
     if (file == null || file.isEmpty()) {
       throw new BadRequestException("file is required");
     }
-    String contentType = file.getContentType();
+    String contentType = resolveContentType(file);
     if (!StringUtils.hasText(contentType) || !contentType.toLowerCase().startsWith("image/")) {
       throw new BadRequestException("Only image/* content types are allowed");
     }
@@ -113,5 +114,20 @@ public class AssetPhotoController {
         p.getCreatedBy(),
         "/assets/photos/" + p.getId()
     );
+  }
+
+  private static String resolveContentType(MultipartFile file) {
+    String ct = file.getContentType();
+    if (StringUtils.hasText(ct) && !MediaType.APPLICATION_OCTET_STREAM_VALUE.equalsIgnoreCase(ct)) {
+      return ct;
+    }
+
+    String filename = file.getOriginalFilename();
+    String guessed = filename == null ? null : URLConnection.guessContentTypeFromName(filename);
+    if (StringUtils.hasText(guessed)) {
+      return guessed;
+    }
+
+    return StringUtils.hasText(ct) ? ct : null;
   }
 }

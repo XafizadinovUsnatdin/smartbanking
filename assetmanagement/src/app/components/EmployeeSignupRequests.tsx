@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { useI18n } from '../i18n/I18nProvider';
 import { useAuth } from './AuthProvider';
 import type { EmployeeSignupRequest, EmployeeSignupRequestStatus } from '../types';
-import { approveEmployeeSignupRequest, listEmployeeSignupRequests, rejectEmployeeSignupRequest } from '../lib/api/identity';
+import { approveEmployeeSignupRequest, listDepartments, listEmployeeSignupRequests, rejectEmployeeSignupRequest } from '../lib/api/identity';
 import { formatDateTime } from '../lib/utils';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
@@ -71,21 +71,41 @@ export function EmployeeSignupRequestsPanel({ embedded = false, focusId = null }
   const [decisionKind, setDecisionKind] = useState<'approve' | 'reject'>('approve');
   const [decisionTarget, setDecisionTarget] = useState<EmployeeSignupRequest | null>(null);
   const [decisionNote, setDecisionNote] = useState('');
+  const [decisionDepartmentId, setDecisionDepartmentId] = useState<string>('');
+  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
   const [deciding, setDeciding] = useState(false);
 
   const openDecision = (kind: 'approve' | 'reject', target: EmployeeSignupRequest) => {
     setDecisionKind(kind);
     setDecisionTarget(target);
     setDecisionNote('');
+    setDecisionDepartmentId('');
     setDecisionOpen(true);
   };
+
+  useEffect(() => {
+    if (!decisionOpen) return;
+    if (decisionKind !== 'approve') return;
+    (async () => {
+      try {
+        const deps = await listDepartments();
+        setDepartments(deps.map((d) => ({ id: d.id, name: d.name })));
+      } catch {
+        setDepartments([]);
+      }
+    })();
+  }, [decisionOpen, decisionKind]);
 
   const submitDecision = async () => {
     if (!decisionTarget) return;
     setDeciding(true);
     try {
       if (decisionKind === 'approve') {
-        await approveEmployeeSignupRequest(decisionTarget.id, decisionNote || null);
+        if (!decisionDepartmentId) {
+          toast.error(t('user.departmentRequired'));
+          return;
+        }
+        await approveEmployeeSignupRequest(decisionTarget.id, decisionNote || null, decisionDepartmentId);
         toast.success(t('signupRequests.approved'));
       } else {
         await rejectEmployeeSignupRequest(decisionTarget.id, decisionNote || null);
@@ -236,6 +256,24 @@ export function EmployeeSignupRequestsPanel({ embedded = false, focusId = null }
             <Label htmlFor="note">{t('signupRequests.dialog.note')}</Label>
             <Input id="note" value={decisionNote} onChange={(e) => setDecisionNote(e.target.value)} placeholder={t('signupRequests.dialog.notePlaceholder')} />
           </div>
+
+          {decisionKind === 'approve' ? (
+            <div className="space-y-2">
+              <Label>{t('department.field')}</Label>
+              <Select value={decisionDepartmentId} onValueChange={setDecisionDepartmentId}>
+                <SelectTrigger>
+                  <SelectValue placeholder={t('common.select')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {departments.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>
+                      {d.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setDecisionOpen(false)} disabled={deciding}>

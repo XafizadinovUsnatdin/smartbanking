@@ -2,6 +2,8 @@ package com.smartbanking.identity.web;
 
 import com.smartbanking.identity.domain.Role;
 import com.smartbanking.identity.domain.UserAccount;
+import com.smartbanking.identity.domain.Department;
+import com.smartbanking.identity.repo.DepartmentRepository;
 import com.smartbanking.identity.repo.UserAccountRepository;
 import com.smartbanking.identity.security.JwtService;
 import jakarta.validation.Valid;
@@ -21,11 +23,13 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class AuthController {
   private final UserAccountRepository userRepo;
+  private final DepartmentRepository departmentRepo;
   private final PasswordEncoder passwordEncoder;
   private final JwtService jwtService;
 
-  public AuthController(UserAccountRepository userRepo, PasswordEncoder passwordEncoder, JwtService jwtService) {
+  public AuthController(UserAccountRepository userRepo, DepartmentRepository departmentRepo, PasswordEncoder passwordEncoder, JwtService jwtService) {
     this.userRepo = userRepo;
+    this.departmentRepo = departmentRepo;
     this.passwordEncoder = passwordEncoder;
     this.jwtService = jwtService;
   }
@@ -109,21 +113,33 @@ public class AuthController {
     if (userRepo.existsByUsername(req.username())) {
       throw new ConflictException("Username already exists");
     }
+
+    Set<Role> roles = req.roles() == null ? Set.of() : req.roles();
+    if (roles.contains(Role.EMPLOYEE) && req.departmentId() == null) {
+      throw new BadRequestException("departmentId is required for EMPLOYEE");
+    }
+
+    UUID departmentId = req.departmentId();
+    UUID branchId = req.branchId();
+    if (departmentId != null) {
+      Department d = departmentRepo.findById(departmentId).orElseThrow(() -> new NotFoundException("Department not found"));
+      branchId = d.getBranchId();
+    }
     var user = new UserAccount(
         UUID.randomUUID(),
         req.username(),
         passwordEncoder.encode(req.password()),
         req.fullName(),
         normalize(req.jobTitle(), 120),
-        req.departmentId(),
-        req.branchId(),
+        departmentId,
+        branchId,
         Instant.now(),
         null,
         normalize(req.phoneNumber(), 32),
         normalizeTelegramUsername(req.telegramUsername()),
         req.telegramUserId(),
         req.telegramChatId(),
-        req.roles()
+        roles
     );
     userRepo.save(user);
     return new CreatedUserResponse(user.getId(), user.getUsername(), user.getFullName(), user.getRoles());

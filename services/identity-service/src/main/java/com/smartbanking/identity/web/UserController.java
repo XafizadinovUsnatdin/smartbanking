@@ -2,6 +2,8 @@ package com.smartbanking.identity.web;
 
 import com.smartbanking.identity.domain.Role;
 import com.smartbanking.identity.domain.UserAccount;
+import com.smartbanking.identity.domain.Department;
+import com.smartbanking.identity.repo.DepartmentRepository;
 import com.smartbanking.identity.repo.UserAccountRepository;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Size;
@@ -23,9 +25,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/users")
 public class UserController {
   private final UserAccountRepository repo;
+  private final DepartmentRepository departmentRepo;
 
-  public UserController(UserAccountRepository repo) {
+  public UserController(UserAccountRepository repo, DepartmentRepository departmentRepo) {
     this.repo = repo;
+    this.departmentRepo = departmentRepo;
   }
 
   public record UserResponse(
@@ -160,11 +164,27 @@ public class UserController {
     if (req.jobTitle() != null) {
       user.setJobTitle(normalize(req.jobTitle(), 120));
     }
+
+    Department dept = null;
     if (req.departmentId() != null) {
+      dept = departmentRepo.findById(req.departmentId()).orElseThrow(() -> new NotFoundException("Department not found"));
       user.setDepartmentId(req.departmentId());
-    }
-    if (req.branchId() != null) {
+      user.setBranchId(dept.getBranchId());
+    } else if (req.branchId() != null) {
+      if (user.getRoles() != null && user.getRoles().contains(Role.EMPLOYEE)) {
+        throw new BadRequestException("branchId cannot be set directly for EMPLOYEE");
+      }
       user.setBranchId(req.branchId());
+    }
+
+    if (user.getRoles() != null && user.getRoles().contains(Role.EMPLOYEE)) {
+      if (user.getDepartmentId() == null) {
+        throw new BadRequestException("departmentId is required for EMPLOYEE");
+      }
+      if (dept == null) {
+        dept = departmentRepo.findById(user.getDepartmentId()).orElseThrow(() -> new NotFoundException("Department not found"));
+      }
+      user.setBranchId(dept.getBranchId());
     }
     if (req.phoneNumber() != null) {
       user.setPhoneNumber(normalize(req.phoneNumber(), 32));

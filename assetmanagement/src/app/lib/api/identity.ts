@@ -22,6 +22,11 @@ function invalidateDepartmentsCache() {
   departmentsInflight.clear();
 }
 
+function invalidateBranchesCache() {
+  branchesCache = null;
+  branchesInflight = null;
+}
+
 export interface TokenResponse {
   accessToken: string;
   refreshToken: string;
@@ -86,10 +91,12 @@ export interface CreatedUserResponse {
 }
 
 export async function adminCreateUser(req: CreateUserRequest): Promise<CreatedUserResponse> {
-  return request<CreatedUserResponse>(`${apiBase.identity}/auth/admin/create-user`, {
+  const res = await request<CreatedUserResponse>(`${apiBase.identity}/auth/admin/create-user`, {
     method: 'POST',
     body: JSON.stringify(req),
   });
+  invalidateUsersCache();
+  return res;
 }
 
 export interface UpdateUserContactsRequest {
@@ -147,6 +154,34 @@ export async function listBranches(): Promise<Branch[]> {
   return branchesInflight;
 }
 
+export interface UpsertBranchRequest {
+  name: string;
+  address?: string | null;
+}
+
+export async function createBranch(body: UpsertBranchRequest): Promise<Branch> {
+  const res = await request<Branch>(`${apiBase.identity}/branches`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+  invalidateBranchesCache();
+  return res;
+}
+
+export async function updateBranch(id: string, body: UpsertBranchRequest): Promise<Branch> {
+  const res = await request<Branch>(`${apiBase.identity}/branches/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  });
+  invalidateBranchesCache();
+  return res;
+}
+
+export async function deleteBranch(id: string): Promise<void> {
+  await request<void>(`${apiBase.identity}/branches/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  invalidateBranchesCache();
+}
+
 export async function listDepartments(branchId?: string): Promise<Department[]> {
   const key = branchId || 'all';
   const now = Date.now();
@@ -181,6 +216,15 @@ export interface UpsertDepartmentRequest {
   telegramChatId?: number | null;
 }
 
+export async function createDepartment(body: UpsertDepartmentRequest): Promise<Department> {
+  const res = await request<Department>(`${apiBase.identity}/departments`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+  invalidateDepartmentsCache();
+  return res;
+}
+
 export async function updateDepartment(id: string, body: UpsertDepartmentRequest): Promise<Department> {
   const res = await request<Department>(`${apiBase.identity}/departments/${encodeURIComponent(id)}`, {
     method: 'PUT',
@@ -190,15 +234,20 @@ export async function updateDepartment(id: string, body: UpsertDepartmentRequest
   return res;
 }
 
+export async function deleteDepartment(id: string): Promise<void> {
+  await request<void>(`${apiBase.identity}/departments/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  invalidateDepartmentsCache();
+}
+
 export async function listEmployeeSignupRequests(status: EmployeeSignupRequestStatus = 'PENDING'): Promise<EmployeeSignupRequest[]> {
   const url = `${apiBase.identity}/employee-signup-requests?status=${encodeURIComponent(status)}`;
   return request<EmployeeSignupRequest[]>(url);
 }
 
-export async function approveEmployeeSignupRequest(id: string, note?: string | null): Promise<EmployeeSignupRequest> {
+export async function approveEmployeeSignupRequest(id: string, note?: string | null, departmentId?: string | null): Promise<EmployeeSignupRequest> {
   const res = await request<EmployeeSignupRequest>(`${apiBase.identity}/employee-signup-requests/${encodeURIComponent(id)}/approve`, {
     method: 'POST',
-    body: JSON.stringify(note ? { note } : {}),
+    body: JSON.stringify({ ...(note ? { note } : {}), ...(departmentId ? { departmentId } : {}) }),
   });
   invalidateUsersCache();
   return res;

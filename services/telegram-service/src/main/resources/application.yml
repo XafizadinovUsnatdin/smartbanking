@@ -32,6 +32,7 @@ services:
 telegram:
   bot:
     token: ${TELEGRAM_BOT_TOKEN:}
+  default-employee-department-id: ${TELEGRAM_DEFAULT_EMPLOYEE_DEPARTMENT_ID:}
   polling:
     enabled: ${TELEGRAM_POLLING_ENABLED:true}
     timeout-seconds: ${TELEGRAM_POLL_TIMEOUT_SECONDS:20}
@@ -47,4 +48,3 @@ management:
     web:
       exposure:
         include: health,info,metrics,prometheus
-

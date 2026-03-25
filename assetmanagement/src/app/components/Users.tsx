@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
-import { Building2, Package, QrCode, RefreshCcw, Search, User as UserIcon, Users as UsersIcon } from 'lucide-react';
+import { Building2, Package, Plus, QrCode, RefreshCcw, Search, User as UserIcon, UserPlus, Users as UsersIcon } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { toast } from 'sonner';
 import { useI18n } from '../i18n/I18nProvider';
 import { useAuth } from './AuthProvider';
 import { bulkAssetQrTokens } from '../lib/api/qr';
 import { downloadAssetPhotoByUrl, getActiveOwnerSummary, listAssignedAssets, listCategories, listLatestPhotos } from '../lib/api/assets';
-import { listBranches, listDepartments, listUsers, updateDepartment, updateUser } from '../lib/api/identity';
+import { adminCreateUser, createBranch, createDepartment, listBranches, listDepartments, listUsers, updateDepartment, updateUser } from '../lib/api/identity';
 import type { AssetCategory, AssetStatus, AssignedAsset, Branch, Department, OwnerType, User } from '../types';
 import { formatDateTime, statusColors } from '../lib/utils';
 import { Button } from './ui/button';
@@ -41,6 +41,25 @@ export function Users() {
   const canEdit = roles.some((r) => ['ADMIN', 'IT_ADMIN', 'ASSET_MANAGER'].includes(r));
 
   const [query, setQuery] = useState('');
+
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createKind, setCreateKind] = useState<'BRANCH' | 'DEPARTMENT' | 'EMPLOYEE'>('EMPLOYEE');
+  const [createSaving, setCreateSaving] = useState(false);
+
+  const [createBranchName, setCreateBranchName] = useState('');
+  const [createBranchAddress, setCreateBranchAddress] = useState('');
+
+  const [createDepartmentName, setCreateDepartmentName] = useState('');
+  const [createDepartmentBranchId, setCreateDepartmentBranchId] = useState<string | 'NONE'>('NONE');
+
+  const [createEmployeeUsername, setCreateEmployeeUsername] = useState('');
+  const [createEmployeePassword, setCreateEmployeePassword] = useState('');
+  const [createEmployeeFullName, setCreateEmployeeFullName] = useState('');
+  const [createEmployeeJobTitle, setCreateEmployeeJobTitle] = useState('');
+  const [createEmployeeDepartmentId, setCreateEmployeeDepartmentId] = useState('');
+  const [createEmployeePhone, setCreateEmployeePhone] = useState('');
+  const [createEmployeeTelegramUsername, setCreateEmployeeTelegramUsername] = useState('');
+  const [createEmployeeTelegramUserId, setCreateEmployeeTelegramUserId] = useState('');
 
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<User[]>([]);
@@ -277,6 +296,7 @@ export function Users() {
 
   const [editEmployeeFullName, setEditEmployeeFullName] = useState('');
   const [editEmployeeJobTitle, setEditEmployeeJobTitle] = useState('');
+  const [editEmployeeDepartmentId, setEditEmployeeDepartmentId] = useState<string>('');
   const [editEmployeePhone, setEditEmployeePhone] = useState('');
   const [editEmployeeTelegramUsername, setEditEmployeeTelegramUsername] = useState('');
   const [editEmployeeTelegramUserId, setEditEmployeeTelegramUserId] = useState('');
@@ -287,12 +307,105 @@ export function Users() {
   const [editDepartmentTelegramUsername, setEditDepartmentTelegramUsername] = useState('');
   const [editDepartmentTelegramChatId, setEditDepartmentTelegramChatId] = useState('');
 
+  const openCreate = (kind: 'BRANCH' | 'DEPARTMENT' | 'EMPLOYEE') => {
+    setCreateKind(kind);
+
+    setCreateBranchName('');
+    setCreateBranchAddress('');
+
+    setCreateDepartmentName('');
+    setCreateDepartmentBranchId('NONE');
+
+    setCreateEmployeeUsername('');
+    setCreateEmployeePassword('');
+    setCreateEmployeeFullName('');
+    setCreateEmployeeJobTitle('');
+    setCreateEmployeeDepartmentId('');
+    setCreateEmployeePhone('');
+    setCreateEmployeeTelegramUsername('');
+    setCreateEmployeeTelegramUserId('');
+
+    setCreateOpen(true);
+  };
+
+  const submitCreate = async () => {
+    setCreateSaving(true);
+    try {
+      if (createKind === 'BRANCH') {
+        if (!createBranchName.trim()) {
+          toast.error(t('error.fillRequired'));
+          return;
+        }
+        await createBranch({ name: createBranchName.trim(), address: createBranchAddress.trim() || null });
+        toast.success(t('common.create'));
+      } else if (createKind === 'DEPARTMENT') {
+        if (!createDepartmentName.trim()) {
+          toast.error(t('error.fillRequired'));
+          return;
+        }
+        await createDepartment({
+          name: createDepartmentName.trim(),
+          branchId: createDepartmentBranchId === 'NONE' ? null : createDepartmentBranchId,
+        });
+        toast.success(t('common.create'));
+      } else {
+        if (!createEmployeeUsername.trim() || !createEmployeePassword || !createEmployeeFullName.trim()) {
+          toast.error(t('error.fillRequired'));
+          return;
+        }
+        if (createEmployeePassword.length < 8) {
+          toast.error(t('login.passwordMin'));
+          return;
+        }
+        if (!createEmployeeDepartmentId) {
+          toast.error(t('user.departmentRequired'));
+          return;
+        }
+
+        const created = await adminCreateUser({
+          username: createEmployeeUsername.trim(),
+          password: createEmployeePassword,
+          fullName: createEmployeeFullName.trim(),
+          departmentId: createEmployeeDepartmentId,
+          roles: ['EMPLOYEE'],
+        });
+
+        const tgUserIdRaw = createEmployeeTelegramUserId.trim();
+        const tgUserId = tgUserIdRaw ? Number(tgUserIdRaw) : undefined;
+        if (tgUserIdRaw && (!Number.isFinite(tgUserId) || tgUserId <= 0)) {
+          toast.error(t('user.contact.telegramIdInvalid'));
+          return;
+        }
+
+        if (createEmployeeJobTitle.trim() || createEmployeePhone.trim() || createEmployeeTelegramUsername.trim() || tgUserIdRaw) {
+          await updateUser(created.id, {
+            jobTitle: createEmployeeJobTitle.trim() || null,
+            departmentId: createEmployeeDepartmentId,
+            phoneNumber: createEmployeePhone.trim() || null,
+            telegramUsername: createEmployeeTelegramUsername.trim() || null,
+            telegramUserId: tgUserIdRaw ? tgUserId : null,
+          });
+        }
+
+        toast.success(t('common.create'));
+      }
+
+      setCreateOpen(false);
+      await reload();
+    } catch (e: any) {
+      toast.error(e?.message || t('error.create'));
+    } finally {
+      setCreateSaving(false);
+    }
+  };
+
   const openEdit = (r: OwnerRow) => {
     setEditTarget(r);
     if (r.ownerType === 'EMPLOYEE') {
       const u = userById[r.ownerId];
       setEditEmployeeFullName(u?.fullName || '');
       setEditEmployeeJobTitle(u?.jobTitle || '');
+      setEditEmployeeDepartmentId(u?.departmentId || '');
       setEditEmployeePhone(u?.phoneNumber || '');
       setEditEmployeeTelegramUsername(u?.telegramUsername || '');
       setEditEmployeeTelegramUserId(u?.telegramUserId ? String(u.telegramUserId) : '');
@@ -316,6 +429,10 @@ export function Users() {
           toast.error(t('error.fillRequired'));
           return;
         }
+        if (!editEmployeeDepartmentId) {
+          toast.error(t('user.departmentRequired'));
+          return;
+        }
         const tgUserIdRaw = editEmployeeTelegramUserId.trim();
         const tgUserId = tgUserIdRaw ? Number(tgUserIdRaw) : undefined;
         if (tgUserIdRaw && !Number.isFinite(tgUserId)) {
@@ -326,6 +443,7 @@ export function Users() {
         await updateUser(editTarget.ownerId, {
           fullName: editEmployeeFullName,
           jobTitle: editEmployeeJobTitle,
+          departmentId: editEmployeeDepartmentId,
           phoneNumber: editEmployeePhone,
           telegramUsername: editEmployeeTelegramUsername,
           telegramUserId: tgUserId,
@@ -531,10 +649,28 @@ export function Users() {
           <h2 className="text-3xl font-bold text-gray-900">{t('page.users.title')}</h2>
           <p className="text-gray-500 mt-1">{t('page.users.subtitle')}</p>
         </div>
-        <Button variant="outline" onClick={reload} disabled={loading}>
-          <RefreshCcw className="w-4 h-4 mr-2" />
-          {t('action.refresh')}
-        </Button>
+        <div className="flex items-center gap-2">
+          {canEdit && (
+            <>
+              <Button variant="outline" onClick={() => openCreate('BRANCH')} disabled={loading}>
+                <Plus className="w-4 h-4 mr-2" />
+                {t('users.action.addBranch')}
+              </Button>
+              <Button variant="outline" onClick={() => openCreate('DEPARTMENT')} disabled={loading}>
+                <Plus className="w-4 h-4 mr-2" />
+                {t('users.action.addDepartment')}
+              </Button>
+              <Button onClick={() => openCreate('EMPLOYEE')} disabled={loading}>
+                <UserPlus className="w-4 h-4 mr-2" />
+                {t('users.action.addEmployee')}
+              </Button>
+            </>
+          )}
+          <Button variant="outline" onClick={reload} disabled={loading}>
+            <RefreshCcw className="w-4 h-4 mr-2" />
+            {t('action.refresh')}
+          </Button>
+        </div>
       </div>
 
       <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
@@ -860,6 +996,126 @@ export function Users() {
       </Dialog>
 
       <Dialog
+        open={createOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCreateOpen(false);
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {createKind === 'BRANCH'
+                ? t('users.action.addBranch')
+                : createKind === 'DEPARTMENT'
+                  ? t('users.action.addDepartment')
+                  : t('users.action.addEmployee')}
+            </DialogTitle>
+            <DialogDescription>{t('common.create')}</DialogDescription>
+          </DialogHeader>
+
+          {createKind === 'BRANCH' ? (
+            <div className="space-y-4">
+              <div>
+                <Label>{t('field.name')}</Label>
+                <Input value={createBranchName} onChange={(e) => setCreateBranchName(e.target.value)} />
+              </div>
+              <div>
+                <Label>{t('branch.field.address')}</Label>
+                <Input value={createBranchAddress} onChange={(e) => setCreateBranchAddress(e.target.value)} />
+              </div>
+            </div>
+          ) : createKind === 'DEPARTMENT' ? (
+            <div className="space-y-4">
+              <div>
+                <Label>{t('field.name')}</Label>
+                <Input value={createDepartmentName} onChange={(e) => setCreateDepartmentName(e.target.value)} />
+              </div>
+              <div>
+                <Label>{t('department.field.branch')}</Label>
+                <Select value={createDepartmentBranchId} onValueChange={(v) => setCreateDepartmentBranchId(v as string | 'NONE')}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={t('common.select')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="NONE">{t('common.none')}</SelectItem>
+                    {branches.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>
+                        {b.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <Label>{t('login.username')}</Label>
+                  <Input value={createEmployeeUsername} onChange={(e) => setCreateEmployeeUsername(e.target.value)} autoComplete="off" />
+                </div>
+                <div>
+                  <Label>{t('login.password')}</Label>
+                  <Input value={createEmployeePassword} onChange={(e) => setCreateEmployeePassword(e.target.value)} type="password" autoComplete="new-password" />
+                </div>
+              </div>
+              <div>
+                <Label>{t('user.field.fullName')}</Label>
+                <Input value={createEmployeeFullName} onChange={(e) => setCreateEmployeeFullName(e.target.value)} />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <Label>{t('user.field.jobTitle')}</Label>
+                  <Input value={createEmployeeJobTitle} onChange={(e) => setCreateEmployeeJobTitle(e.target.value)} />
+                </div>
+                <div>
+                  <Label>{t('department.field')}</Label>
+                  <Select value={createEmployeeDepartmentId} onValueChange={setCreateEmployeeDepartmentId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder={t('common.select')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {departments.map((d) => (
+                        <SelectItem key={d.id} value={d.id}>
+                          {d.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <Label>{t('user.contact.phone')}</Label>
+                  <Input value={createEmployeePhone} onChange={(e) => setCreateEmployeePhone(e.target.value)} placeholder={t('user.contact.phonePlaceholder')} />
+                </div>
+                <div>
+                  <Label>{t('user.contact.telegramUsername')}</Label>
+                  <Input value={createEmployeeTelegramUsername} onChange={(e) => setCreateEmployeeTelegramUsername(e.target.value)} placeholder={t('user.contact.telegramUsernamePlaceholder')} />
+                </div>
+              </div>
+              <div>
+                <Label>{t('user.contact.telegramUserId')}</Label>
+                <Input value={createEmployeeTelegramUserId} onChange={(e) => setCreateEmployeeTelegramUserId(e.target.value)} placeholder={t('user.contact.telegramUserIdPlaceholder')} inputMode="numeric" />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateOpen(false)} disabled={createSaving}>
+              {t('common.cancel')}
+            </Button>
+            <Button onClick={submitCreate} disabled={createSaving}>
+              {t('common.create')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
         open={editOpen}
         onOpenChange={(open) => {
           if (!open) {
@@ -890,6 +1146,22 @@ export function Users() {
               <div>
                 <Label>{t('user.field.jobTitle')}</Label>
                 <Input value={editEmployeeJobTitle} onChange={(e) => setEditEmployeeJobTitle(e.target.value)} />
+              </div>
+
+              <div>
+                <Label>{t('department.field')}</Label>
+                <Select value={editEmployeeDepartmentId} onValueChange={setEditEmployeeDepartmentId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={t('common.select')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {departments.map((d) => (
+                      <SelectItem key={d.id} value={d.id}>
+                        {d.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

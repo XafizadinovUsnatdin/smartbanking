@@ -4,6 +4,8 @@ import com.smartbanking.identity.domain.EmployeeSignupRequest;
 import com.smartbanking.identity.domain.EmployeeSignupRequestStatus;
 import com.smartbanking.identity.domain.Role;
 import com.smartbanking.identity.domain.UserAccount;
+import com.smartbanking.identity.domain.Department;
+import com.smartbanking.identity.repo.DepartmentRepository;
 import com.smartbanking.identity.repo.EmployeeSignupRequestRepository;
 import com.smartbanking.identity.repo.UserAccountRepository;
 import jakarta.validation.Valid;
@@ -36,11 +38,13 @@ public class EmployeeSignupRequestController {
 
   private final EmployeeSignupRequestRepository reqRepo;
   private final UserAccountRepository userRepo;
+  private final DepartmentRepository departmentRepo;
   private final PasswordEncoder passwordEncoder;
 
-  public EmployeeSignupRequestController(EmployeeSignupRequestRepository reqRepo, UserAccountRepository userRepo, PasswordEncoder passwordEncoder) {
+  public EmployeeSignupRequestController(EmployeeSignupRequestRepository reqRepo, UserAccountRepository userRepo, DepartmentRepository departmentRepo, PasswordEncoder passwordEncoder) {
     this.reqRepo = reqRepo;
     this.userRepo = userRepo;
+    this.departmentRepo = departmentRepo;
     this.passwordEncoder = passwordEncoder;
   }
 
@@ -111,7 +115,7 @@ public class EmployeeSignupRequestController {
     return reqRepo.findAllByStatusOrderByCreatedAtDesc(s).stream().map(EmployeeSignupRequestController::toResponse).toList();
   }
 
-  public record DecisionRequest(@Size(max = 1000) String note) {}
+  public record DecisionRequest(@Size(max = 1000) String note, UUID departmentId) {}
 
   @PostMapping("/{id}/approve")
   @PreAuthorize("hasRole('ADMIN')")
@@ -119,6 +123,9 @@ public class EmployeeSignupRequestController {
     EmployeeSignupRequest r = reqRepo.findById(id).orElseThrow(() -> new NotFoundException("Request not found"));
     if (r.getStatus() != EmployeeSignupRequestStatus.PENDING) {
       throw new ConflictException("Request already decided");
+    }
+    if (req == null || req.departmentId() == null) {
+      throw new BadRequestException("departmentId is required");
     }
 
     if (userRepo.findByTelegramUserId(r.getTelegramUserId()).isPresent()) {
@@ -143,14 +150,15 @@ public class EmployeeSignupRequestController {
     }
 
     String rawPassword = "Tg" + randomHex(24) + "!";
+    Department dept = departmentRepo.findById(req.departmentId()).orElseThrow(() -> new NotFoundException("Department not found"));
     var user = new UserAccount(
         UUID.randomUUID(),
         username,
         passwordEncoder.encode(rawPassword),
         r.getFullName(),
         r.getJobTitle(),
-        null,
-        null,
+        req.departmentId(),
+        dept.getBranchId(),
         Instant.now(),
         null,
         r.getPhoneNumber(),
@@ -161,7 +169,7 @@ public class EmployeeSignupRequestController {
     );
     userRepo.save(user);
 
-    r.approve(actor(auth), normalize(req == null ? null : req.note(), 1000), user.getId(), Instant.now());
+    r.approve(actor(auth), normalize(req.note(), 1000), user.getId(), Instant.now());
     EmployeeSignupRequest saved = reqRepo.save(r);
     return toResponse(saved);
   }
