@@ -3,6 +3,7 @@
 Bank ofisi uchun **aktivlarni boshqarish** platformasi: aktiv hayotiy sikli, biriktirish, QR, audit va analitika.
 
 Texnologiyalar: Java 17, Spring Boot, PostgreSQL, Kafka, Redis, Vite.
+<img width="1280" height="642" alt="image" src="https://github.com/user-attachments/assets/20f60640-8027-4b39-af1d-8896587562b8" />
 
 ## Loyihaning tuzilishi
 
